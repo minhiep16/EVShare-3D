@@ -1,0 +1,295 @@
+import React, { useState } from 'react';
+
+const AdminDisputes = () => {
+  const [activeDisputes, setActiveDisputes] = useState([
+    {
+      id: 'DS-9021',
+      priority: 'Ưu tiên cao',
+      openTime: '08:45 · 10/06',
+      car: 'Tesla Model 3',
+      plate: '51G-888.99',
+      title: 'Chiếm dụng thời gian sử dụng sai quy định',
+      desc: 'Người dùng Trần Anh Khoa đã không trả xe đúng hạn (quá 2 tiếng) làm ảnh hưởng đến lịch đặt xe đã được xác nhận của Nguyễn Thị Lan. Chị Lan yêu cầu bồi hoàn phí thuê xe ngoài và trừ điểm uy tín của anh Khoa.',
+      defendant: 'T.A.Khoa (Bên bị)',
+      defendantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg',
+      complainant: 'N.T.Lan (Bên khiếu nại)',
+      complainantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg'
+    },
+    {
+      id: 'DS-8945',
+      priority: 'Vừa',
+      openTime: '14:20 · 09/06',
+      car: 'BYD Atto 3',
+      plate: '43C-789.01',
+      title: 'Tranh chấp chi phí sửa chữa ngoại thất',
+      desc: 'Phát hiện vết trầy xước lớn tại cửa sau bên lái sau khi anh Lê Minh Tuấn trả xe. Anh Tuấn khẳng định vết xước có từ trước, tuy nhiên ảnh Check-in không thể hiện rõ. Nhóm đang tranh cãi về việc chia tiền túi 1.2 triệu đồng hay trích từ quỹ chung.',
+      defendant: 'L.M.Tuấn (Liên quan)',
+      defendantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg',
+      complainant: 'Toàn bộ nhóm #EV-2024-018',
+      complainantAvatar: null
+    }
+  ]);
+
+  const [resolvedDisputes, setResolvedDisputes] = useState([
+    { id: 'DS-8812', title: 'Lỗi vệ sinh khoang lái', car: 'Hyundai Ioniq 6', result: 'Đã bồi hoàn 200k', date: '08/06/2025', staff: 'Hoàng Nam', avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg' },
+    { id: 'DS-8790', title: 'Cố tình tắt định vị GPS', car: 'VinFast VF9', result: 'Cảnh cáo bằng văn bản', date: '05/06/2025', staff: 'Hoàng Nam', avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg' }
+  ]);
+
+  const handleResolveImmediately = (dispute) => {
+    const choice = confirm(
+      `⚖️ BẮT ĐẦU PHÂN GIẢI VỤ VIỆC #${dispute.id}:\n"${dispute.title}"\n\n` +
+      `Bấm OK để phê duyệt phương án: Khấu trừ quỹ của bên có lỗi & bồi thường cho bên bị hại.\n` +
+      `Bấm CANCEL để đưa vụ việc vào trạng thái điều tra bổ sung.`
+    );
+
+    if (choice) {
+      // Move to resolved disputes
+      const newResolved = {
+        id: dispute.id,
+        title: dispute.title,
+        car: dispute.car,
+        result: dispute.id === 'DS-9021' ? 'Bồi hoàn 500k & trừ 5đ uy tín' : 'Trích quỹ bảo dưỡng 1.2M',
+        date: 'Hôm nay',
+        staff: 'Phạm Quốc Hùng',
+        avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
+      };
+
+      setResolvedDisputes(prev => [newResolved, ...prev]);
+      setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
+      alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id}!`);
+    } else {
+      alert(`🕵️ Vụ việc #${dispute.id} đã được chuyển sang bộ phận Điều tra & Xác minh vệ tinh.`);
+    }
+  };
+
+  const activeCount = activeDisputes.length;
+  const highPriorityCount = activeDisputes.filter(d => d.priority === 'Ưu tiên cao').length;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-600">
+              <i className="ph ph-scales"></i>
+            </div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Đang chờ xử lý</p>
+          </div>
+          <p className="text-3xl font-bold text-ink">{activeCount < 10 ? `0${activeCount}` : activeCount}</p>
+          <p className={`text-xs mt-1 font-medium ${highPriorityCount > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+            {highPriorityCount > 0 ? `${highPriorityCount} yêu cầu ưu tiên cao` : 'Không có yêu cầu khẩn cấp'}
+          </p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+              <i className="ph ph-clock"></i>
+            </div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Thời gian trung bình</p>
+          </div>
+          <p className="text-3xl font-bold text-ink">4.2h</p>
+          <p className="text-xs text-brand-600 mt-1 font-semibold">Giảm 15% so với tuần trước</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600">
+              <i className="ph ph-check-circle"></i>
+            </div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tỉ lệ hòa giải</p>
+          </div>
+          <p className="text-3xl font-bold text-ink">92%</p>
+          <p className="text-xs text-slate-500 mt-1 font-medium">Dựa trên 45 vụ việc tháng này</p>
+        </div>
+      </div>
+
+      {/* Active Disputes List */}
+      <div className="space-y-6">
+        <h2 className="text-base font-bold flex items-center gap-2 text-slate-900">
+          <i className="ph ph-lightning text-amber-500 animate-pulse"></i> Tranh chấp đang hoạt động
+        </h2>
+
+        {activeDisputes.map((dis) => {
+          const isHigh = dis.priority === 'Ưu tiên cao';
+          
+          return (
+            <div 
+              key={dis.id} 
+              className={`bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col md:flex-row border ${
+                isHigh ? 'border-2 border-red-100' : 'border-slate-200'
+              }`}
+            >
+              {/* Left sidebar card in row */}
+              <div className={`w-full md:w-64 p-6 border-b md:border-b-0 md:border-r flex flex-col justify-between ${
+                isHigh ? 'bg-red-50/50 border-red-100' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <div>
+                  <span className={`inline-flex items-center px-2 py-1 text-[10px] font-bold uppercase rounded mb-3 ${
+                    isHigh ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                  }`}>
+                    {dis.priority}
+                  </span>
+                  <h3 className={`text-lg font-bold ${isHigh ? 'text-red-900' : 'text-slate-900'}`}>#{dis.id}</h3>
+                  <p className={`text-xs font-medium mt-1 ${isHigh ? 'text-red-700' : 'text-slate-500'}`}>Mở lúc: {dis.openTime}</p>
+                </div>
+                
+                <div className="mt-6 md:mt-0">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-2">Nhóm xe</p>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-lg bg-white flex items-center justify-center border ${
+                      isHigh ? 'border-red-100' : 'border-slate-200'
+                    }`}>
+                      <i className={`ph ph-car text-xl ${isHigh ? 'text-red-500' : 'text-slate-400'}`}></i>
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${isHigh ? 'text-red-900' : 'text-slate-950'}`}>{dis.car}</p>
+                      <p className={`text-xs ${isHigh ? 'text-red-700' : 'text-slate-500'}`}>{dis.plate}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main content body in row */}
+              <div className="flex-1 p-6 flex flex-col justify-between">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-slate-900 mb-2 text-base">{dis.title}</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">{dis.desc}</p>
+                    
+                    <div className="mt-4 flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200">
+                        {dis.defendantAvatar ? (
+                          <img src={dis.defendantAvatar} className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">G18</div>
+                        )}
+                        <span className="text-xs font-medium text-slate-600">{dis.defendant}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-2.5 py-1.5 border border-slate-200">
+                        {dis.complainantAvatar ? (
+                          <img src={dis.complainantAvatar} className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold">G18</div>
+                        )}
+                        <span className="text-xs font-medium text-slate-600">{dis.complainant}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 shrink-0 self-stretch md:self-auto justify-end">
+                    <button 
+                      onClick={() => handleResolveImmediately(dis)}
+                      className={`px-6 py-2.5 text-white text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer ${
+                        isHigh ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-slate-900 hover:bg-slate-800'
+                      }`}
+                    >
+                      {isHigh ? 'Xử lý ngay' : 'Điều tra'}
+                    </button>
+                    
+                    <button 
+                      onClick={() => alert(`📩 Đã gửi tin nhắn nhắc nhở/thông báo hòa giải tới các bên của nhóm xe ${dis.car}.`)}
+                      className="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+                    >
+                      {isHigh ? 'Gửi thông báo' : 'Hòa giải nhanh'}
+                    </button>
+                  </div>
+                </div>
+
+                {isHigh && (
+                  <div className="mt-6 pt-6 border-t border-slate-100 flex items-center gap-4 overflow-x-auto pb-2">
+                    <div 
+                      onClick={() => alert('📊 Log GPS thể hiện xe di chuyển trễ và check-out muộn 2 giờ 12 phút.')}
+                      className="w-16 h-16 rounded-lg bg-slate-100 flex flex-col items-center justify-center text-slate-500 border border-slate-200 shrink-0 cursor-pointer hover:bg-slate-200 hover:text-ink transition-colors"
+                    >
+                      <i className="ph ph-clock-countdown text-xl mb-0.5"></i>
+                      <span className="text-[9px] font-bold">Lịch trình</span>
+                    </div>
+                    
+                    <div 
+                      onClick={() => alert('💬 Đoạn chat nhóm thể hiện anh Khoa phản hồi trễ và xác nhận trả muộn.')}
+                      className="w-16 h-16 rounded-lg bg-slate-100 flex flex-col items-center justify-center text-slate-500 border border-slate-200 shrink-0 cursor-pointer hover:bg-slate-200 hover:text-ink transition-colors"
+                    >
+                      <i className="ph ph-chat-text text-xl mb-0.5"></i>
+                      <span className="text-[9px] font-bold">Tin nhắn</span>
+                    </div>
+                    
+                    <div 
+                      onClick={() => alert('📍 Bản đồ GPS xác nhận xe đỗ tại khu vực Quận 7 trong giờ bàn giao.')}
+                      className="w-16 h-16 rounded-lg bg-slate-100 flex flex-col items-center justify-center text-slate-500 border border-slate-200 shrink-0 cursor-pointer hover:bg-slate-200 hover:text-ink transition-colors"
+                    >
+                      <i className="ph ph-map-pin text-xl mb-0.5"></i>
+                      <span className="text-[9px] font-bold">Bản đồ</span>
+                    </div>
+                    
+                    <p className="text-xs text-slate-400 font-medium">Nhấp các biểu tượng để xem bằng chứng tự động từ hệ thống (GPS, Log chat, Lịch sử check-out)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {activeCount === 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
+            <div className="w-16 h-16 bg-green-50 text-[#22c55e] rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+              <i className="ph ph-check-circle-fill"></i>
+            </div>
+            <h3 className="text-lg font-bold text-ink mb-1">Hoàn thành xuất sắc!</h3>
+            <p className="text-sm text-slate-500">Tất cả các vụ tranh chấp trong hệ thống đã được phân giải xong.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Resolved Disputes Section */}
+      <div className="mt-12">
+        <h2 className="text-base font-bold text-slate-500 mb-6 flex items-center gap-2">
+          <i className="ph ph-check-circle"></i> Đã giải quyết gần đây
+        </h2>
+        
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100 text-slate-400">
+                  <th className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide">Vụ việc</th>
+                  <th className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide">Nhóm xe</th>
+                  <th className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide">Kết quả phân giải</th>
+                  <th className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide">Ngày đóng</th>
+                  <th className="text-left py-3 px-6 text-xs font-semibold uppercase tracking-wide">Staff xử lý</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 text-ink">
+                {resolvedDisputes.map((res) => (
+                  <tr key={res.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-4 px-6">
+                      <p className="font-bold">{res.title}</p>
+                      <p className="text-[10px] text-slate-400 font-semibold">#{res.id}</p>
+                    </td>
+                    <td className="py-4 px-6 font-medium">{res.car}</td>
+                    <td className="py-4 px-6">
+                      <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
+                        {res.result}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-slate-500 font-medium">{res.date}</td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        <img src={res.avatar} className="w-5 h-5 rounded-full object-cover" />
+                        <span className="text-xs font-medium text-slate-700">{res.staff}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AdminDisputes;

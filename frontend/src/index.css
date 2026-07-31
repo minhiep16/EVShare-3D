@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #ecfdf5;
+  --color-brand-100: #d1fae5;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  
+  --color-ink: #0f172a;
+}
+
+::-webkit-scrollbar { width:0; height:0; display:none; }
+body { -ms-overflow-style:none; scrollbar-width:none; }
+.cal-cell { transition: transform .12s ease, box-shadow .12s ease; }
+.cal-cell:hover { transform: translateY(-1px); box-shadow: 0 4px 12px -4px rgba(15,23,42,.18); }
