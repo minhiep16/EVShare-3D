@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getUnassignedUsers, getAllVehicles, addMemberToVehicle } from '../services/api';
+import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups } from '../services/api';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const AdminDashboard = () => {
   const [disputes, setDisputes] = useState([
@@ -9,9 +10,26 @@ const AdminDashboard = () => {
 
   const [unassignedUsers, setUnassignedUsers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [vehicleGroups, setVehicleGroups] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [ownershipShare, setOwnershipShare] = useState('');
+
+  const revenueData = [
+    { name: 'T1', doanhThu: 120, chiPhi: 40 },
+    { name: 'T2', doanhThu: 150, chiPhi: 60 },
+    { name: 'T3', doanhThu: 130, chiPhi: 50 },
+    { name: 'T4', doanhThu: 160, chiPhi: 70 },
+    { name: 'T5', doanhThu: 180, chiPhi: 65 },
+    { name: 'T6', doanhThu: 176, chiPhi: 80 }
+  ];
+
+  const vehicleData = [
+    { name: 'Sẵn sàng', value: 16, color: '#22c55e' },
+    { name: 'Đang dùng', value: 8, color: '#3b82f6' },
+    { name: 'Bảo dưỡng', value: 3, color: '#f59e0b' },
+    { name: 'Sự cố', value: 1, color: '#ef4444' }
+  ];
 
   useEffect(() => {
     fetchData();
@@ -23,6 +41,8 @@ const AdminDashboard = () => {
       setUnassignedUsers(users);
       const vehs = await getAllVehicles();
       setVehicles(vehs);
+      const groups = await getVehicleGroups();
+      setVehicleGroups(groups);
     } catch (err) {
       console.error('Failed to fetch admin data', err);
     }
@@ -133,51 +153,16 @@ const AdminDashboard = () => {
           </div>
           
           <div className="relative w-full h-[250px]">
-            <svg viewBox="0 0 600 250" className="w-full h-full">
-              {/* Horizontal Gridlines */}
-              <line x1="50" y1="30" x2="570" y2="30" stroke="#f8fafc" strokeWidth="1" />
-              <line x1="50" y1="80" x2="570" y2="80" stroke="#f8fafc" strokeWidth="1" />
-              <line x1="50" y1="130" x2="570" y2="130" stroke="#f8fafc" strokeWidth="1" />
-              <line x1="50" y1="180" x2="570" y2="180" stroke="#f8fafc" strokeWidth="1" />
-              <line x1="50" y1="210" x2="570" y2="210" stroke="#cbd5e1" strokeWidth="1.5" />
-
-              {/* Y Axis Values */}
-              <text x="40" y="34" textAnchor="end" className="text-[10px] fill-slate-400 font-bold">200M</text>
-              <text x="40" y="84" textAnchor="end" className="text-[10px] fill-slate-400 font-bold">150M</text>
-              <text x="40" y="134" textAnchor="end" className="text-[10px] fill-slate-400 font-bold">100M</text>
-              <text x="40" y="184" textAnchor="end" className="text-[10px] fill-slate-400 font-bold">50M</text>
-              <text x="40" y="214" textAnchor="end" className="text-[10px] fill-slate-400 font-bold">0</text>
-
-              {/* T1 */}
-              <rect x="75" y="82.2" width="16" height="127.8" rx="2" className="fill-[#22c55e]" />
-              <rect x="93" y="157.8" width="16" height="52.2" rx="2" className="fill-slate-200" />
-              <text x="92" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T1</text>
-              
-              {/* T2 */}
-              <rect x="155" y="70.5" width="16" height="139.5" rx="2" className="fill-[#22c55e]" />
-              <rect x="173" y="153.3" width="16" height="56.7" rx="2" className="fill-slate-200" />
-              <text x="172" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T2</text>
-              
-              {/* T3 */}
-              <rect x="235" y="76.8" width="16" height="133.2" rx="2" className="fill-[#22c55e]" />
-              <rect x="253" y="160.5" width="16" height="49.5" rx="2" className="fill-slate-200" />
-              <text x="252" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T3</text>
-              
-              {/* T4 */}
-              <rect x="315" y="65.1" width="16" height="144.9" rx="2" className="fill-[#22c55e]" />
-              <rect x="333" y="147" width="16" height="63" rx="2" className="fill-slate-200" />
-              <text x="332" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T4</text>
-              
-              {/* T5 */}
-              <rect x="395" y="57.9" width="16" height="152.1" rx="2" className="fill-[#22c55e]" />
-              <rect x="413" y="148.8" width="16" height="61.2" rx="2" className="fill-slate-200" />
-              <text x="412" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T5</text>
-              
-              {/* T6 */}
-              <rect x="475" y="51.6" width="16" height="158.4" rx="2" className="fill-[#22c55e]" />
-              <rect x="493" y="145.2" width="16" height="64.8" rx="2" className="fill-slate-200" />
-              <text x="492" y="232" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T6</text>
-            </svg>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Bar dataKey="doanhThu" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={16} name="Doanh thu (Triệu)" />
+                <Bar dataKey="chiPhi" fill="#cbd5e1" radius={[4, 4, 0, 0]} barSize={16} name="Chi phí (Triệu)" />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -190,18 +175,26 @@ const AdminDashboard = () => {
           
           <div className="flex-1 flex items-center justify-center py-2">
             <div className="relative w-44 h-44">
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e2e8f0" strokeWidth="3"/>
-                {/* Sẵn sàng (16/28 = 57.1%) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#22c55e" strokeWidth="3" strokeDasharray="57.1 42.9" strokeLinecap="round"/>
-                {/* Đang dùng (8/28 = 28.6%) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#3b82f6" strokeWidth="3" strokeDasharray="28.6 71.4" strokeDashoffset="-57.1" strokeLinecap="round"/>
-                {/* Bảo dưỡng (3/28 = 10.7%) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="3" strokeDasharray="10.7 89.3" strokeDashoffset="-85.7" strokeLinecap="round"/>
-                {/* Sự cố (1/28 = 3.6%) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" strokeWidth="3" strokeDasharray="3.6 96.4" strokeDashoffset="-96.4" strokeLinecap="round"/>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={vehicleData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                    {vehicleData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <p className="text-xl font-bold tracking-tight text-ink">28 xe</p>
                 <p className="text-[10px] text-slate-400 font-semibold uppercase">Hệ thống</p>
               </div>
@@ -252,108 +245,59 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 text-ink">
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3">
-                    <div>
-                      <p className="font-bold">Tesla Model 3</p>
-                      <p className="text-xs text-slate-400">51G-888.99</p>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">#EV-2025-001</td>
-                  <td className="py-3 px-3">
-                    <div className="flex -space-x-1.5">
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                    </div>
-                  </td>
-                  <td className="py-3 px-3"><span className="text-xs text-[#16a34a] font-semibold">✓ HĐ hợp lệ</span></td>
-                  <td className="py-3 px-3">
-                    <span className="text-xs font-medium text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">Sẵn sàng</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <button className="text-slate-400 hover:text-[#22c55e] transition-colors cursor-pointer">
-                      <i className="ph ph-arrow-square-out text-lg"></i>
-                    </button>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3">
-                    <div>
-                      <p className="font-bold">VinFast VF9</p>
-                      <p className="text-xs text-slate-400">51K-123.45</p>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">#EV-2025-002</td>
-                  <td className="py-3 px-3">
-                    <div className="flex -space-x-1.5">
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-8.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <span className="w-6 h-6 rounded-full border-2 border-white bg-slate-200 text-[9px] flex items-center justify-center font-bold text-slate-500">+2</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3"><span className="text-xs text-[#16a34a] font-semibold">✓ HĐ hợp lệ</span></td>
-                  <td className="py-3 px-3">
-                    <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Đang dùng</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <button className="text-slate-400 hover:text-[#22c55e] transition-colors cursor-pointer">
-                      <i className="ph ph-arrow-square-out text-lg"></i>
-                    </button>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3">
-                    <div>
-                      <p className="font-bold">Hyundai Ioniq 6</p>
-                      <p className="text-xs text-slate-400">79A-456.78</p>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">#EV-2025-003</td>
-                  <td className="py-3 px-3">
-                    <div className="flex -space-x-1.5">
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-1.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-5.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-7.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                    </div>
-                  </td>
-                  <td className="py-3 px-3"><span className="text-xs text-amber-600 font-semibold">⏳ HĐ chờ ký</span></td>
-                  <td className="py-3 px-3">
-                    <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Bảo dưỡng</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <button className="text-slate-400 hover:text-[#22c55e] transition-colors cursor-pointer">
-                      <i className="ph ph-arrow-square-out text-lg"></i>
-                    </button>
-                  </td>
-                </tr>
-
-                <tr className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3">
-                    <div>
-                      <p className="font-bold">BYD Atto 3</p>
-                      <p className="text-xs text-slate-400">43C-789.01</p>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-slate-500">#EV-2024-018</td>
-                  <td className="py-3 px-3">
-                    <div className="flex -space-x-1.5">
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                      <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg" className="w-6 h-6 rounded-full border-2 border-white object-cover" />
-                    </div>
-                  </td>
-                  <td className="py-3 px-3"><span className="text-xs text-[#16a34a] font-semibold">✓ HĐ hợp lệ</span></td>
-                  <td className="py-3 px-3">
-                    <span className="text-xs font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Sự cố</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <button className="text-slate-400 hover:text-[#22c55e] transition-colors cursor-pointer">
-                      <i className="ph ph-arrow-square-out text-lg"></i>
-                    </button>
-                  </td>
-                </tr>
+                {vehicleGroups.map((group) => {
+                  const v = group.vehicle;
+                  const members = group.members || [];
+                  return (
+                    <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-3">
+                        <div>
+                          <p className="font-bold">{v.model}</p>
+                          <p className="text-xs text-slate-400">{v.licensePlate}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-500">#EV-2025-{v.id.toString().padStart(3, '0')}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex -space-x-1.5">
+                          {members.length === 0 ? (
+                            <span className="text-xs text-slate-400">Trống</span>
+                          ) : (
+                            members.slice(0, 3).map((m, idx) => (
+                              <img key={m.id} src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-6 h-6 rounded-full border-2 border-white object-cover" title={m.fullName} />
+                            ))
+                          )}
+                          {members.length > 3 && (
+                            <span className="w-6 h-6 rounded-full border-2 border-white bg-slate-200 text-[9px] flex items-center justify-center font-bold text-slate-500">
+                              +{members.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        {members.length > 0 ? (
+                          <span className="text-xs text-[#16a34a] font-semibold">✓ HĐ hợp lệ</span>
+                        ) : (
+                          <span className="text-xs text-amber-600 font-semibold">⏳ Chờ TV</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          v.status === 'AVAILABLE' ? 'text-[#16a34a] bg-[#ecfdf5]' :
+                          v.status === 'IN_USE' ? 'text-blue-600 bg-blue-50' :
+                          v.status === 'MAINTENANCE' ? 'text-amber-600 bg-amber-50' :
+                          'text-red-500 bg-red-50'
+                        }`}>
+                          {v.status === 'AVAILABLE' ? 'Sẵn sàng' : v.status === 'IN_USE' ? 'Đang dùng' : v.status === 'MAINTENANCE' ? 'Bảo dưỡng' : 'Sự cố'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <button className="text-slate-400 hover:text-[#22c55e] transition-colors cursor-pointer">
+                          <i className="ph ph-arrow-square-out text-lg"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

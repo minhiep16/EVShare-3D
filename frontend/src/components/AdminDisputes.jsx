@@ -1,39 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getAdminDisputes } from '../services/api';
 
 const AdminDisputes = () => {
-  const [activeDisputes, setActiveDisputes] = useState([
-    {
-      id: 'DS-9021',
-      priority: 'Ưu tiên cao',
-      openTime: '08:45 · 10/06',
-      car: 'Tesla Model 3',
-      plate: '51G-888.99',
-      title: 'Chiếm dụng thời gian sử dụng sai quy định',
-      desc: 'Người dùng Trần Anh Khoa đã không trả xe đúng hạn (quá 2 tiếng) làm ảnh hưởng đến lịch đặt xe đã được xác nhận của Nguyễn Thị Lan. Chị Lan yêu cầu bồi hoàn phí thuê xe ngoài và trừ điểm uy tín của anh Khoa.',
-      defendant: 'T.A.Khoa (Bên bị)',
-      defendantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg',
-      complainant: 'N.T.Lan (Bên khiếu nại)',
-      complainantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg'
-    },
-    {
-      id: 'DS-8945',
-      priority: 'Vừa',
-      openTime: '14:20 · 09/06',
-      car: 'BYD Atto 3',
-      plate: '43C-789.01',
-      title: 'Tranh chấp chi phí sửa chữa ngoại thất',
-      desc: 'Phát hiện vết trầy xước lớn tại cửa sau bên lái sau khi anh Lê Minh Tuấn trả xe. Anh Tuấn khẳng định vết xước có từ trước, tuy nhiên ảnh Check-in không thể hiện rõ. Nhóm đang tranh cãi về việc chia tiền túi 1.2 triệu đồng hay trích từ quỹ chung.',
-      defendant: 'L.M.Tuấn (Liên quan)',
-      defendantAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg',
-      complainant: 'Toàn bộ nhóm #EV-2024-018',
-      complainantAvatar: null
-    }
-  ]);
+  const [activeDisputes, setActiveDisputes] = useState([]);
+  const [resolvedDisputes, setResolvedDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [resolvedDisputes, setResolvedDisputes] = useState([
-    { id: 'DS-8812', title: 'Lỗi vệ sinh khoang lái', car: 'Hyundai Ioniq 6', result: 'Đã bồi hoàn 200k', date: '08/06/2025', staff: 'Hoàng Nam', avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg' },
-    { id: 'DS-8790', title: 'Cố tình tắt định vị GPS', car: 'VinFast VF9', result: 'Cảnh cáo bằng văn bản', date: '05/06/2025', staff: 'Hoàng Nam', avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-4.jpg' }
-  ]);
+  useEffect(() => {
+    const fetchDisputes = async () => {
+      try {
+        setLoading(true);
+        const data = await getAdminDisputes();
+        
+        const active = data.filter(d => d.status !== 'RESOLVED').map(d => ({
+          id: `DS-${d.id.toString().padStart(4, '0')}`,
+          priority: d.priority === 'HIGH' ? 'Ưu tiên cao' : (d.priority === 'MEDIUM' ? 'Vừa' : 'Thấp'),
+          openTime: d.createdAt ? new Date(d.createdAt).toLocaleString('vi-VN', {hour: '2-digit', minute:'2-digit', day: '2-digit', month: '2-digit'}) : 'Unknown',
+          car: d.vehicle?.model || 'Unknown',
+          plate: d.vehicle?.licensePlate || 'Unknown',
+          title: d.title,
+          desc: d.description,
+          defendant: 'Hệ thống tự động',
+          defendantAvatar: null,
+          complainant: d.createdBy?.name || 'Người dùng',
+          complainantAvatar: d.createdBy?.avatarUrl || null,
+          dbId: d.id
+        }));
+
+        const resolved = data.filter(d => d.status === 'RESOLVED').map(d => ({
+          id: `DS-${d.id.toString().padStart(4, '0')}`,
+          title: d.title,
+          car: d.vehicle?.model || 'Unknown',
+          result: 'Đã giải quyết',
+          date: d.updatedAt ? new Date(d.updatedAt).toLocaleDateString('vi-VN') : 'Unknown',
+          staff: 'Admin EVShare',
+          avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
+        }));
+
+        setActiveDisputes(active);
+        setResolvedDisputes(resolved);
+      } catch (error) {
+        console.error("Failed to fetch disputes", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDisputes();
+  }, []);
 
   const handleResolveImmediately = (dispute) => {
     const choice = confirm(

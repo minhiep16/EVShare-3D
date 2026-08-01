@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const HistoryPage = ({ currentUser }) => {
+const HistoryPage = ({ currentUser, bookings }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [period, setPeriod] = useState('month'); // month, quarter, year
@@ -9,15 +9,23 @@ const HistoryPage = ({ currentUser }) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
-  // Static list of trips matching mockup
-  const allTrips = [
-    { id: 1, date: '08/06', time: '09:00 – 11:30', purpose: 'Đi công tác Q.1', icon: 'ph ph-briefcase', distance: 45, duration: 2.5, cost: 92000 },
-    { id: 2, date: '06/06', time: '15:00 – 17:00', purpose: 'Đón con', icon: 'ph ph-baby', distance: 28, duration: 2.0, cost: 57400 },
-    { id: 3, date: '03/06', time: '07:30 – 10:00', purpose: 'Siêu thị', icon: 'ph ph-shopping-cart', distance: 22, duration: 2.5, cost: 45100 },
-    { id: 4, date: '28/05', time: '08:00 – 12:00', purpose: 'Du lịch ngắn ngày', icon: 'ph ph-map-pin', distance: 120, duration: 4.0, cost: 246000 },
-    { id: 5, date: '22/05', time: '16:00 – 18:30', purpose: 'Khám bệnh', icon: 'ph ph-hospital', distance: 35, duration: 2.5, cost: 71750 },
-    { id: 6, date: '18/05', time: '09:00 – 11:00', purpose: 'Họp đối tác', icon: 'ph ph-briefcase', distance: 55, duration: 2.0, cost: 112750 }
-  ];
+  // Map bookings to trips
+  const allTrips = (bookings || []).filter(b => b.status === 'COMPLETED' || b.status === 'PENDING').map(b => {
+    const start = new Date(b.startTime);
+    const end = new Date(b.endTime);
+    const diffHours = (end - start) / (1000 * 60 * 60);
+    return {
+      id: b.id,
+      date: start.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+      time: `${start.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`,
+      purpose: b.purpose || 'Không rõ',
+      icon: 'ph ph-map-pin',
+      distance: Math.round(diffHours * 15), // Mock distance
+      duration: diffHours.toFixed(1),
+      cost: Math.round(diffHours * 20000), // Mock cost
+      status: b.status
+    };
+  });
 
   // Filtering trips based on search query
   const filteredTrips = allTrips.filter(t => 
@@ -254,8 +262,10 @@ const HistoryPage = ({ currentUser }) => {
                   <td className="py-3 px-3 text-slate-500">{t.duration} giờ</td>
                   <td className="py-3 px-3 font-medium text-red-500">{formatCurrency(t.cost)}</td>
                   <td className="py-3 px-3">
-                    <span className="text-xs font-medium text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">
-                      Hoàn thành
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      t.status === 'COMPLETED' ? 'text-[#16a34a] bg-[#ecfdf5]' : 'text-amber-600 bg-amber-50'
+                    }`}>
+                      {t.status === 'COMPLETED' ? 'Hoàn thành' : 'Đang chờ'}
                     </span>
                   </td>
                 </tr>

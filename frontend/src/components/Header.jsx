@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Header = ({ currentUser, activeTab, onMenuToggle }) => {
+const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
   const getFormattedDate = () => {
     const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     const now = new Date();
@@ -150,7 +150,7 @@ const Header = ({ currentUser, activeTab, onMenuToggle }) => {
           </button>
           
           <button 
-            onClick={() => alert('➕ Mở form thiết lập nhóm xe co-owning mới...')}
+            onClick={onCreateVehicle || (() => alert('➕ Mở form thiết lập nhóm xe co-owning mới...'))}
             className="inline-flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
           >
             <i className="ph ph-plus"></i>Tạo nhóm xe mới

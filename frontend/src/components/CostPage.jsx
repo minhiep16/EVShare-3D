@@ -6,7 +6,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
   const [filterType, setFilterType] = useState('Tất cả');
 
   // Find the pending transaction (Đăng kiểm)
-  const pendingTx = transactions.find(t => t.status === 'PENDING');
+  const pendingTx = transactions.find(t => t.status === 'PENDING' || t.title?.includes('Đăng kiểm'));
   const unpaidAmount = pendingTx ? pendingTx.amount * 0.4 : 0;
 
   const handlePayment = () => {
@@ -18,7 +18,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
     // Update local state to simulate successful payment
     const updated = transactions.map(t => {
       if (t.id === pendingTx.id) {
-        return { ...t, status: 'PAID' };
+        return { ...t, status: 'PAID' }; // Just mock updating local state
       }
       return t;
     });
@@ -51,7 +51,8 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
   // Filter transactions based on selected type
   const filteredTransactions = transactions.filter(t => {
     if (filterType === 'Tất cả') return true;
-    return t.categoryName === filterType;
+    const catName = t.categoryName || t.title;
+    return catName === filterType || (catName && catName.includes(filterType));
   });
 
   // Calculate totals
@@ -284,9 +285,11 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
               </thead>
               <tbody className="divide-y divide-slate-50 text-ink">
                 {filteredTransactions.map((t) => {
-                  const isPaid = t.status === 'PAID';
+                  const isPaid = t.status ? t.status === 'PAID' : true; // default paid for IN/OUT
                   const isPending = t.status === 'PENDING';
                   const userPart = t.amount * 0.4;
+                  const catName = t.categoryName || t.title;
+                  const tDate = t.date || t.transactionDate;
                   
                   return (
                     <tr 
@@ -294,12 +297,12 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                       className={`hover:bg-slate-50 transition-colors ${isPending ? 'bg-amber-50/40' : ''}`}
                     >
                       <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
-                        {formatDate(t.date)}
+                        {tDate ? new Date(tDate).toLocaleDateString('vi-VN') : ''}
                       </td>
                       <td className="py-3 px-3">
                         <span className="flex items-center gap-2">
                           <i className={getIconClassForCategory(t.type)}></i>
-                          {t.categoryName}
+                          {catName}
                         </span>
                       </td>
                       <td className="py-3 px-3 font-medium">{formatCurrency(t.amount)}</td>

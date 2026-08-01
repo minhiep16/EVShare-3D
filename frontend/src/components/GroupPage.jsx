@@ -1,9 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getVehicleTransactions } from '../services/api';
 
 const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCast }) => {
   const [votes, setVotes] = useState(initialVotes);
   const [fundBalance, setFundBalance] = useState(15800000);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [fundHistory, setFundHistory] = useState([]);
+  
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      // User must be part of a vehicle
+      if (currentUser?.vehicle?.id || 1) {
+        try {
+          const vehicleId = currentUser?.vehicle?.id || 1;
+          const data = await getVehicleTransactions(vehicleId);
+          // map FundTransaction entity to the component state
+          const history = data.map(t => ({
+            type: t.type,
+            title: t.title,
+            desc: t.description || new Date(t.transactionDate).toLocaleDateString('vi-VN'),
+            amount: t.type === 'OUT' ? -t.amount : t.amount
+          }));
+          setFundHistory(history.slice(0, 5)); // show latest 5
+        } catch (error) {
+          console.error("Failed to fetch fund history", error);
+        }
+      }
+    };
+    fetchTransactions();
+  }, [currentUser]);
 
   const handleVote = async (voteId, agree) => {
     // Call parents vote cast handler
@@ -11,18 +36,19 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
       await onVoteCast(voteId);
     }
     
-    // Locally simulate vote completion for immediate UI feedback
     const updated = votes.map(v => {
       if (v.id === voteId) {
-        const newAgreed = agree ? Math.min(v.agreedCount + 1, v.totalCount) : v.agreedCount;
-        const newStatus = newAgreed >= v.totalCount ? 'CLOSED' : 'OPEN';
-        const newDesc = newAgreed >= v.totalCount 
-          ? `Nâng cấp pin xe – ${newAgreed}/${v.totalCount} đồng ý (Hoàn thành)` 
-          : `Nâng cấp pin xe – ${newAgreed}/${v.totalCount} đồng ý`;
+        // Here we simulate the update, real data should come from backend
+        // We assume current user has some percentage, for mock let's add 30%
+        const newAgreed = agree ? Math.min((v.agreedPercentage || 0) + 30.0, 100.0) : (v.agreedPercentage || 0);
+        const newStatus = newAgreed >= 50.0 ? 'CLOSED' : 'OPEN';
+        const newDesc = newAgreed >= 50.0 
+          ? `Nâng cấp pin xe – Đã thông qua (${newAgreed}% đồng ý)` 
+          : `Nâng cấp pin xe – ${newAgreed}% đồng ý`;
 
         return {
           ...v,
-          agreedCount: newAgreed,
+          agreedPercentage: newAgreed,
           status: newStatus,
           description: newDesc
         };
@@ -43,13 +69,7 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
-  // Static fund history list matching mockup
-  const fundHistory = [
-    { type: 'IN', title: 'Nạp quỹ hàng tháng', desc: '3 thành viên · 01/06/2025', amount: 3000000 },
-    { type: 'OUT', title: 'Bảo dưỡng định kỳ 6 tháng', desc: '05/06/2025', amount: -2400000 },
-    { type: 'IN', title: 'Nạp quỹ hàng tháng', desc: '3 thành viên · 01/05/2025', amount: 3000000 },
-    { type: 'OUT', title: 'Thay lốp xe', desc: '18/05/2025', amount: -1800000 }
-  ];
+  // Fund history is now dynamically fetched
 
   // Static past votes matching mockup
   const pastVotes = [
@@ -71,51 +91,37 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
           </div>
 
           {/* Member list rendering */}
-          {coOwners.map((owner) => {
-            const isMai = owner.name.includes('Mai');
-            const isBinh = owner.name.includes('Bình');
-            const isTuan = owner.name.includes('Tuấn');
-
-            // Render details from mock markup
-            let km = "342 km";
-            let cost = "2,940,000₫";
-            let colorClass = "text-blue-500";
-            let circleColor = "#3b82f6";
-            let strokeDash = "30 70";
-
-            if (isMai) {
-              km = "342 km";
-              cost = "2,940,000₫";
-              colorClass = "text-[#22c55e]";
-              circleColor = "#22c55e";
-              strokeDash = "40 60";
-            } else if (isBinh) {
-              km = "428 km";
-              cost = "2,205,000₫";
-              colorClass = "text-blue-500";
-              circleColor = "#3b82f6";
-              strokeDash = "30 70";
-            } else if (isTuan) {
-              km = "285 km";
-              cost = "2,205,000₫ ⚠️";
-              colorClass = "text-amber-500";
-              circleColor = "#f59e0b";
-              strokeDash = "30 70";
-            }
+          {coOwners.map((owner, idx) => {
+            const isCurrentUser = currentUser?.id === owner.id;
+            
+            // Generate some mock stats based on index since we don't have real data for these yet
+            const mockKms = ["342 km", "428 km", "285 km", "120 km", "50 km"];
+            const mockCosts = ["2,940,000₫", "2,205,000₫", "2,205,000₫ ⚠️", "850,000₫", "300,000₫"];
+            const colors = [
+              { colorClass: "text-[#22c55e]", circleColor: "#22c55e", strokeDash: "40 60" },
+              { colorClass: "text-blue-500", circleColor: "#3b82f6", strokeDash: "30 70" },
+              { colorClass: "text-amber-500", circleColor: "#f59e0b", strokeDash: "30 70" },
+              { colorClass: "text-purple-500", circleColor: "#a855f7", strokeDash: "20 80" },
+              { colorClass: "text-pink-500", circleColor: "#ec4899", strokeDash: "10 90" }
+            ];
+            
+            const km = mockKms[idx % mockKms.length];
+            const cost = mockCosts[idx % mockCosts.length];
+            const colorProps = colors[idx % colors.length];
 
             return (
               <div 
                 key={owner.id} 
                 className={`flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-2xl border mb-3 last:mb-0 ${
-                  isMai 
+                  isCurrentUser 
                     ? 'border-2 border-[#22c55e]/40 bg-[#ecfdf5]/50' 
                     : 'border-slate-200'
                 }`}
               >
                 <img 
-                  src={owner.avatarUrl} 
+                  src={owner.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
                   alt={owner.name} 
-                  className={`w-14 h-14 rounded-2xl object-cover shrink-0 ${isMai ? 'ring-2 ring-[#22c55e]/50' : ''}`}
+                  className={`w-14 h-14 rounded-2xl object-cover shrink-0 ${isCurrentUser ? 'ring-2 ring-[#22c55e]/50' : ''}`}
                 />
                 
                 <div className="flex-1 min-w-0">
@@ -126,7 +132,7 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                         Admin nhóm
                       </span>
                     )}
-                    {isMai && (
+                    {isCurrentUser && (
                       <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
                         Bạn
                       </span>
@@ -134,13 +140,13 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                   </div>
                   
                   <p className="text-xs text-slate-500 mb-2">
-                    ID: {isMai ? 'NTM-001' : isBinh ? 'TVB-002' : 'LMT-003'} · Tham gia 01/01/2025
+                    ID: MEM-{owner.id.toString().padStart(3, '0')} · Tham gia 01/01/2025
                   </p>
                   
                   <div className="flex items-center gap-4">
                     <div>
                       <p className="text-[11px] text-slate-400">Tỉ lệ sở hữu</p>
-                      <p className={`text-lg font-bold ${colorClass}`}>{owner.ownershipPercentage}%</p>
+                      <p className={`text-lg font-bold ${colorProps.colorClass}`}>{owner.ownershipPercentage}%</p>
                     </div>
                     <div className="w-px h-8 bg-slate-200"></div>
                     <div>
@@ -155,12 +161,12 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                   </div>
                 </div>
 
-                {isMai ? (
+                {isCurrentUser ? (
                   <div className="shrink-0 flex items-center justify-center">
                     <div className="w-16 h-16 relative flex items-center justify-center">
                       <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
                         <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f1f5f9" strokeWidth="3"/>
-                        <circle cx="18" cy="18" r="15.9" fill="none" stroke={circleColor} strokeWidth="3" strokeDasharray={strokeDash} strokeLinecap="round"/>
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke={colorProps.circleColor} strokeWidth="3" strokeDasharray={colorProps.strokeDash} strokeLinecap="round"/>
                       </svg>
                       <span className="absolute text-sm font-bold text-ink">{owner.ownershipPercentage}%</span>
                     </div>
@@ -195,24 +201,18 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
 
           {/* Contribution breakdown */}
           <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="bg-[#ecfdf5] rounded-xl p-3 text-center">
-              <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg" className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-              <p className="text-xs font-medium text-slate-600 mb-1">N.T.Mai</p>
-              <p className="text-sm font-bold text-[#16a34a]">{formatCurrency(fundBalance * 0.40)}</p>
-              <p className="text-[10px] text-slate-400">40%</p>
-            </div>
-            <div className="bg-blue-50 rounded-xl p-3 text-center">
-              <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-              <p className="text-xs font-medium text-slate-600 mb-1">T.V.Bình</p>
-              <p className="text-sm font-bold text-blue-600">{formatCurrency(fundBalance * 0.30)}</p>
-              <p className="text-[10px] text-slate-400">30%</p>
-            </div>
-            <div className="bg-amber-50 rounded-xl p-3 text-center">
-              <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-              <p class="text-xs font-medium text-slate-600 mb-1">L.M.Tuấn</p>
-              <p className="text-sm font-bold text-amber-600">{formatCurrency(fundBalance * 0.30)}</p>
-              <p className="text-[10px] text-slate-400">30%</p>
-            </div>
+            {coOwners.slice(0,3).map((m, idx) => {
+              const bgColors = ["bg-[#ecfdf5]", "bg-blue-50", "bg-amber-50"];
+              const textColors = ["text-[#16a34a]", "text-blue-600", "text-amber-600"];
+              return (
+                <div key={m.id} className={`${bgColors[idx % 3]} rounded-xl p-3 text-center`}>
+                  <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
+                  <p className="text-xs font-medium text-slate-600 mb-1">{m.name.split(' ').pop()}</p>
+                  <p className={`text-sm font-bold ${textColors[idx % 3]}`}>{formatCurrency(fundBalance * (m.ownershipPercentage/100))}</p>
+                  <p className="text-[10px] text-slate-400">{m.ownershipPercentage}%</p>
+                </div>
+              );
+            })}
           </div>
 
           {/* Fund transaction history */}
@@ -253,7 +253,7 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
         {/* Active Vote Card */}
         {votes.map((vote) => {
           const isClosed = vote.status === 'CLOSED';
-          const votePercentage = (vote.agreedCount / vote.totalCount) * 100;
+          const votePercentage = vote.agreedPercentage || 0;
           
           return (
             <div 
@@ -279,25 +279,20 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
 
               {/* Vote status lists */}
               <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-3">
-                  <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                  <p className="text-sm flex-1 text-ink">Nguyễn Thị Mai</p>
-                  <span className="text-xs font-semibold text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">✓ Đồng ý</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                  <p className="text-sm flex-1 text-ink">Trần Văn Bình</p>
-                  <span className="text-xs font-semibold text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">✓ Đồng ý</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                  <p className="text-sm flex-1 text-ink">Lê Minh Tuấn</p>
-                  {isClosed ? (
-                    <span className="text-xs font-semibold text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">✓ Đồng ý</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">⏳ Chưa bỏ phiếu</span>
-                  )}
-                </div>
+                {coOwners.map((m, idx) => {
+                  const voted = isClosed || idx < 2; // Mock logic: first 2 users voted
+                  return (
+                    <div key={m.id} className="flex items-center gap-3">
+                      <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                      <p className="text-sm flex-1 text-ink">{m.name}</p>
+                      {voted ? (
+                        <span className="text-xs font-semibold text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">✓ Đồng ý</span>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">⏳ Chưa bỏ phiếu</span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
@@ -307,8 +302,9 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                 ></div>
               </div>
               
+              
               <p className="text-xs text-slate-400 mb-4 font-medium">
-                {vote.agreedCount}/{vote.totalCount} đồng ý · {isClosed ? 'Đã thông qua' : 'Cần đủ 3/3 để thông qua'}
+                {votePercentage}% đồng ý · {isClosed ? 'Đã thông qua' : 'Cần trên 50% để thông qua'}
               </p>
               
               {!isClosed && (
@@ -370,17 +366,17 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
           <div className="space-y-3">
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Trần Văn Bình đang <span className="text-white font-semibold">sử dụng vượt 28%</span> so với tỉ lệ sở hữu. Cân nhắc điều chỉnh lịch ưu tiên.
+                {coOwners[1]?.name || 'Thành viên'} đang <span className="text-white font-semibold">sử dụng vượt 28%</span> so với tỉ lệ sở hữu. Cân nhắc điều chỉnh lịch ưu tiên.
               </p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Quỹ chung đủ chi trả cho <span className="text-white font-semibold">2 lần bảo dưỡng</span> tiếp theo. Không cần nạp thêm trong tháng 7.
+                Quỹ chung đủ chi trả cho <span className="text-white font-semibold">2 lần bảo dưỡng</span> tiếp theo. Không cần nạp thêm trong tháng tới.
               </p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Lê Minh Tuấn chưa thanh toán chi phí đăng kiểm. Gợi ý <span className="text-white font-semibold">nhắc tự động</span> trước hạn 3 ngày.
+                {coOwners[2]?.name || 'Thành viên'} chưa thanh toán chi phí sửa chữa nhỏ. Gợi ý <span className="text-white font-semibold">nhắc tự động</span> trước hạn 3 ngày.
               </p>
             </div>
           </div>

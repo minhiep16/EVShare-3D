@@ -51,10 +51,47 @@ export const getAllVehicles = async () => {
   return response.data;
 };
 
+export const getVehicleGroups = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/vehicle-groups`);
+  return response.data;
+};
+
 export const addMemberToVehicle = async (vehicleId, userId, ownershipPercentage) => {
   const response = await axios.post(`${API_BASE_URL}/admin/vehicles/${vehicleId}/add-member`, {
     userId,
     ownershipPercentage
   });
+  return response.data;
+};
+
+export const downloadContract = async () => {
+  const response = await axios.get(`${API_BASE_URL}/contracts/download`, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+export const createVehicle = async (vehicleData) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/vehicles`, vehicleData);
+  return response.data;
+};
+
+export const getFinanceSummary = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/finance/summary`);
+  return response.data;
+};
+
+export const getPendingServices = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/services/pending`);
+  return response.data;
+};
+
+export const getAdminDisputes = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/disputes`);
+  return response.data;
+};
+
+export const getVehicleTransactions = async (vehicleId) => {
+  const response = await axios.get(`${API_BASE_URL}/vehicles/${vehicleId}/transactions`);
   return response.data;
 };

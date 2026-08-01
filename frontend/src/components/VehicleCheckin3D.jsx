@@ -1,9 +1,25 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Box, Environment, ContactShadows, Text } from '@react-three/drei';
+import { OrbitControls, Box, Environment, ContactShadows, Text, Html, useProgress } from '@react-three/drei';
+
+const Loader = () => {
+  const { progress } = useProgress();
+  return (
+    <Html center>
+      <div className="flex flex-col items-center justify-center text-white bg-slate-900/80 px-6 py-4 rounded-xl backdrop-blur-md">
+        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="font-semibold">{progress.toFixed(0)}% Loading...</p>
+      </div>
+    </Html>
+  );
+};
 
 const CarModel = ({ onClickPart }) => {
-  // A simple blocky representation of a car since we don't have a GLTF yet.
+  // TODO: When real 3D model is ready, uncomment this and install @react-three/drei's useGLTF
+  // const { scene } = useGLTF('/car_model_compressed.glb'); // Compressed with Draco
+  // return <primitive object={scene} onClick={(e) => { ... }} />
+  
+  // For now, returning a blocky representation of a car.
   return (
     <group>
       {/* Main Body */}
@@ -80,9 +96,11 @@ const VehicleCheckin3D = () => {
           <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
           <Environment preset="city" />
           
-          <CarModel onClickPart={handlePartClick} />
+          <Suspense fallback={<Loader />}>
+            <CarModel onClickPart={handlePartClick} />
+            <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={10} blur={2} far={4} />
+          </Suspense>
           
-          <ContactShadows position={[0, 0, 0]} opacity={0.5} scale={10} blur={2} far={4} />
           <OrbitControls makeDefault autoRotate autoRotateSpeed={0.5} />
         </Canvas>
       </div>

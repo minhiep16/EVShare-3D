@@ -1,18 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getFinanceSummary, getVehicleGroups } from '../services/api';
 
 const AdminFinance = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [period, setPeriod] = useState('month'); // month, quarter, year
+  const [summary, setSummary] = useState(null);
+  const [groupsFinance, setGroupsFinance] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
-  };
-
-  const groupsFinance = [
-    { id: '#EV-2025-001', car: 'Tesla Model 3', plate: '51G-888.99', balance: 15800000, cost: 6120000, charge: '142 kWh', efficiency: 85, status: 'Ổn định', badgeClass: 'bg-brand-50 text-brand-600' },
-    { id: '#EV-2025-002', car: 'VinFast VF9', plate: '51K-123.45', balance: 42500000, cost: 12450000, charge: '380 kWh', efficiency: 92, status: 'Ổn định', badgeClass: 'bg-brand-50 text-brand-600' },
-    { id: '#EV-2025-003', car: 'Hyundai Ioniq 6', plate: '79A-456.78', balance: 2100000, cost: 850000, charge: '85 kWh', efficiency: 45, status: 'Cảnh báo thấp', badgeClass: 'bg-amber-50 text-amber-600' }
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [summaryData, groupsData] = await Promise.all([
+          getFinanceSummary(),
+          getVehicleGroups()
+        ]);
+        
+        setSummary(summaryData);
+        
+        const mappedGroups = groupsData.map(g => ({
+          id: `#EV-2025-${g.vehicle.id.toString().padStart(3, '0')}`,
+          car: g.vehicle.model,
+          plate: g.vehicle.licensePlate,
+          balance: g.vehicle.jointFundBalance || 0,
+          cost: 0, // Should be calculated from transactions in real app
+          charge: '0 kWh', // Mock
+          efficiency: 85, // Mock
+          status: g.vehicle.jointFundBalance > 5000000 ? 'Ổn định' : 'Cảnh báo thấp',
+          badgeClass: g.vehicle.jointFundBalance > 5000000 ? 'bg-brand-50 text-brand-600' : 'bg-amber-50 text-amber-600'
+        }));
+        
+        setGroupsFinance(mappedGroups);
+      } catch (error) {
+        console.error("Failed to fetch finance data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const filteredGroups = groupsFinance.filter(g => 
     g.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -27,7 +54,7 @@ const AdminFinance = () => {
         {/* GMV */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Tổng dòng tiền (GMV)</p>
-          <p className="text-2xl font-bold text-ink">1,842.5M₫</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalIn) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
             <i className="ph ph-trend-up"></i> +12.4% <span className="text-slate-400 font-normal ml-1">với tháng 5</span>
           </div>
@@ -36,7 +63,7 @@ const AdminFinance = () => {
         {/* Revenue */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Phí dịch vụ thu (Revenue)</p>
-          <p className="text-2xl font-bold text-ink">176.8M₫</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalIn * 0.1) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
             <i className="ph ph-trend-up"></i> +8.2% <span className="text-slate-400 font-normal ml-1">với tháng 5</span>
           </div>
@@ -45,7 +72,7 @@ const AdminFinance = () => {
         {/* Maintenance cost */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Chi phí bảo trì hệ thống</p>
-          <p className="text-2xl font-bold text-ink">42.3M₫</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalOut) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-red-500 font-semibold">
             <i className="ph ph-trend-up"></i> +4.1% <span className="text-slate-400 font-normal ml-1">do tăng trạm sạc</span>
           </div>
@@ -54,7 +81,7 @@ const AdminFinance = () => {
         {/* Net Profit */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Lợi nhuận ròng</p>
-          <p className="text-2xl font-bold text-ink">134.5M₫</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency((summary.totalIn * 0.1) - summary.totalOut) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
             <i className="ph ph-trend-up"></i> +9.8% <span className="text-slate-400 font-normal ml-1">tăng trưởng ổn định</span>
           </div>

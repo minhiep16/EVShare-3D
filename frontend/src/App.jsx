@@ -18,7 +18,7 @@ import AdminFinance from './components/AdminFinance';
 import AdminServices from './components/AdminServices';
 import LoginPage from './components/LoginPage';
 import VehicleCheckin3D from './components/VehicleCheckin3D';
-import { getDashboardData, createBooking, castVote } from './services/api';
+import { getDashboardData, createBooking, castVote, createVehicle } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -26,12 +26,16 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [currentRole, setCurrentRole] = useState(() => localStorage.getItem('evshare_currentRole') || 'USER');
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('evshare_isAuthenticated') === 'true');
   const [currentUserInfo, setCurrentUserInfo] = useState(() => {
     const saved = localStorage.getItem('evshare_currentUserInfo');
     return saved ? JSON.parse(saved) : null;
   });
+  const currentRole = currentUserInfo?.role || 'USER';
+  
+  const [isCreateVehicleModalOpen, setIsCreateVehicleModalOpen] = useState(false);
+  const [newVehicle, setNewVehicle] = useState({ model: '', licensePlate: '', imageUrl: '' });
+  const [creatingVehicle, setCreatingVehicle] = useState(false);
 
   const fetchDashboard = async (userId) => {
     try {
@@ -45,7 +49,6 @@ function App() {
         setIsAuthenticated(false);
         setCurrentUserInfo(null);
         localStorage.removeItem('evshare_isAuthenticated');
-        localStorage.removeItem('evshare_currentRole');
         localStorage.removeItem('evshare_currentUserInfo');
         localStorage.removeItem('evshare_jwt_token');
         return;
@@ -81,22 +84,46 @@ function App() {
     alert('🤖 Tính năng Chat với AI đang được phát triển!');
   };
 
+  const handleCreateVehicleSubmit = async (e) => {
+    e.preventDefault();
+    if (!newVehicle.model || !newVehicle.licensePlate) {
+      alert('Vui lòng nhập đủ Model và Biển số xe');
+      return;
+    }
+    try {
+      setCreatingVehicle(true);
+      await createVehicle({
+        model: newVehicle.model,
+        licensePlate: newVehicle.licensePlate,
+        imageUrl: newVehicle.imageUrl || 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+      });
+      alert('✅ Tạo nhóm xe mới thành công!');
+      setIsCreateVehicleModalOpen(false);
+      setNewVehicle({ model: '', licensePlate: '', imageUrl: '' });
+      // If admin, we should refresh the admin dashboard, but here we just fetchDashboard
+      fetchDashboard(currentUserInfo?.id || 1);
+    } catch (err) {
+      console.error(err);
+      alert('❌ Có lỗi xảy ra khi tạo nhóm xe');
+    } finally {
+      setCreatingVehicle(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <LoginPage 
         onLoginSuccess={(role, userInfo) => {
+          const infoWithRole = { ...userInfo, role };
           setIsAuthenticated(true);
           localStorage.setItem('evshare_isAuthenticated', 'true');
-          if (role) {
-            setCurrentRole(role);
-            localStorage.setItem('evshare_currentRole', role);
-            setCurrentUserInfo(userInfo);
-            localStorage.setItem('evshare_currentUserInfo', JSON.stringify(userInfo));
-            if (role === 'ADMIN') {
-              setActiveTab('admin_dashboard');
-            } else {
-              setActiveTab('dashboard');
-            }
+          setCurrentUserInfo(infoWithRole);
+          localStorage.setItem('evshare_currentUserInfo', JSON.stringify(infoWithRole));
+          
+          if (role === 'ADMIN') {
+            setActiveTab('admin_dashboard');
+          } else {
+            setActiveTab('dashboard');
           }
         }} 
       />
@@ -165,12 +192,7 @@ function App() {
   const ownershipPercentage = userProfile?.ownershipPercentage || 40;
 
   const handleRoleChange = (newRole) => {
-    setCurrentRole(newRole);
-    if (newRole === 'ADMIN') {
-      setActiveTab('admin_dashboard');
-    } else {
-      setActiveTab('dashboard');
-    }
+    // Legacy mock function removed
   };
 
   return (
@@ -187,7 +209,6 @@ function App() {
           setIsAuthenticated(false);
           setCurrentUserInfo(null);
           localStorage.removeItem('evshare_isAuthenticated');
-          localStorage.removeItem('evshare_currentRole');
           localStorage.removeItem('evshare_currentUserInfo');
           localStorage.removeItem('evshare_jwt_token');
         }}
@@ -226,8 +247,8 @@ function App() {
                   setCurrentUserInfo(null);
                   setMobileMenuOpen(false);
                   localStorage.removeItem('evshare_isAuthenticated');
-                  localStorage.removeItem('evshare_currentRole');
                   localStorage.removeItem('evshare_currentUserInfo');
+                  localStorage.removeItem('evshare_jwt_token');
                 }}
               />
             </div>
@@ -242,6 +263,7 @@ function App() {
           currentUser={currentUser} 
           activeTab={activeTab}
           onMenuToggle={() => setMobileMenuOpen(true)}
+          onCreateVehicle={() => setIsCreateVehicleModalOpen(true)}
         />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
@@ -297,7 +319,7 @@ function App() {
                     </p>
                     <div className="flex justify-center gap-3">
                       <button 
-                        onClick={() => alert('➕ Tính năng tự tạo nhóm co-owning mới đang được kết nối với ban quản trị.')}
+                        onClick={() => setIsCreateVehicleModalOpen(true)}
                         className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm font-semibold"
                       >
                         Tạo nhóm xe mới
@@ -343,12 +365,15 @@ function App() {
             {activeTab === 'history' && (
               <HistoryPage 
                 currentUser={currentUser}
+                bookings={data?.bookings || []}
               />
             )}
 
             {activeTab === 'contract' && (
               <ContractPage 
                 currentUser={currentUser}
+                vehicle={data?.vehicle}
+                coOwners={data?.coOwners || []}
               />
             )}
 
@@ -407,6 +432,78 @@ function App() {
           </div>
         </div>
       </main>
+
+      {/* Create Vehicle Modal */}
+      {isCreateVehicleModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fade-in-up">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                <i className="ph ph-car-profile text-brand-500"></i>Tạo nhóm xe mới
+              </h3>
+              <button 
+                onClick={() => setIsCreateVehicleModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
+              >
+                <i className="ph ph-x"></i>
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateVehicleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dòng xe (Model) <span className="text-red-500">*</span></label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="VD: VinFast VF8"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.model}
+                  onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Biển số xe <span className="text-red-500">*</span></label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="VD: 51H-123.45"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.licensePlate}
+                  onChange={e => setNewVehicle({...newVehicle, licensePlate: e.target.value})}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Hình ảnh (URL)</label>
+                <input 
+                  type="url"
+                  placeholder="Để trống sẽ dùng ảnh mặc định"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.imageUrl}
+                  onChange={e => setNewVehicle({...newVehicle, imageUrl: e.target.value})}
+                />
+              </div>
+              
+              <div className="pt-2">
+                <button 
+                  type="submit"
+                  disabled={creatingVehicle}
+                  className={`w-full py-2.5 rounded-lg text-sm font-bold text-white transition-colors cursor-pointer flex items-center justify-center gap-2 ${
+                    creatingVehicle ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                  }`}
+                >
+                  {creatingVehicle ? (
+                    <><i className="ph ph-spinner animate-spin text-lg"></i>Đang khởi tạo...</>
+                  ) : (
+                    <><i className="ph ph-plus-circle text-lg"></i>Tạo Nhóm Xe</>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

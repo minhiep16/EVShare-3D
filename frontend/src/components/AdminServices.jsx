@@ -1,84 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getPendingServices } from '../services/api';
 
 const AdminServices = () => {
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [searchQuery, setSearchQuery] = useState('');
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   // Interactive states for card tasks
   const [service1Status, setService1Status] = useState('Sắp đến hạn');
   const [truckDispatched, setTruckDispatched] = useState(false);
 
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        setLoading(true);
+        const data = await getPendingServices();
+        const mappedServices = data.map(s => ({
+          id: s.id,
+          type: s.serviceType,
+          title: s.description,
+          car: s.vehicle?.model || 'Unknown',
+          plate: s.vehicle?.licensePlate || 'Unknown',
+          iconClass: s.serviceType === 'Sửa chữa' ? 'ph ph-warning text-red-600 bg-red-50' : 'ph ph-wrench text-blue-600 bg-blue-50',
+          status: s.status,
+          statusClass: s.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-blue-100 text-blue-700',
+          date: s.scheduledDate ? new Date(s.scheduledDate).toLocaleDateString('vi-VN') : 'N/A',
+          location: 'Trạm EVShare',
+          cost: s.cost || 0,
+          images: [] // Mock for now
+        }));
+        setServices(mappedServices);
+      } catch (err) {
+        console.error("Failed to fetch pending services", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchServices();
+  }, []);
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
-
-  // Card details list
-  const services = [
-    {
-      id: 1,
-      type: 'Bảo dưỡng',
-      title: 'Bảo dưỡng định kỳ',
-      car: 'Tesla Model 3',
-      plate: '51G-888.99',
-      iconClass: 'ph ph-wrench text-blue-600 bg-blue-50',
-      status: service1Status,
-      statusClass: service1Status === 'Đang thực hiện' ? 'bg-blue-100 text-blue-700' : 'bg-amber-50 text-amber-600',
-      date: '15/06/2025',
-      location: 'Tesla Service Q.7',
-      cost: 3200000,
-      admin: 'Nguyễn Thị Mai (Admin Nhóm)',
-      adminAvatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg',
-      adminStatus: 'Đã xác nhận thanh toán từ quỹ'
-    },
-    {
-      id: 2,
-      type: 'Đăng kiểm',
-      title: 'Đăng kiểm xe',
-      car: 'VinFast VF9',
-      plate: '51K-123.45',
-      iconClass: 'ph ph-article text-brand-600 bg-brand-50',
-      status: 'Đang chờ',
-      statusClass: 'bg-slate-100 text-slate-500',
-      date: '20/06/2025',
-      location: 'Trạm 50-03S',
-      cost: 450000,
-      warningText: 'Cần liên hệ staff để nhận bộ hồ sơ gốc từ kho lưu trữ trước ngày 19/06.'
-    },
-    {
-      id: 3,
-      type: 'Sửa chữa',
-      title: 'Sửa chữa khẩn cấp',
-      car: 'BYD Atto 3',
-      plate: '43C-789.01',
-      iconClass: 'ph ph-warning text-red-600 bg-red-50',
-      status: truckDispatched ? 'Đang cứu hộ' : 'Khẩn cấp',
-      statusClass: 'bg-red-500 text-white animate-pulse',
-      date: '09:30 - Hôm nay',
-      location: 'Quốc Lộ 1A - Q.Thủ Đức',
-      issueType: 'Lỗi hệ thống treo',
-      reporter: 'Lê Minh Tuấn',
-      images: [
-        'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_15e5156ab9_bc21f37a4bc75ebf.png',
-        'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_ffc9630ec0_421307653897185e.png'
-      ]
-    },
-    {
-      id: 4,
-      type: 'Vệ sinh',
-      title: 'Vệ sinh chuyên sâu',
-      car: 'Hyundai Ioniq 6',
-      plate: '79A-456.78',
-      iconClass: 'ph ph-drop text-cyan-600 bg-cyan-50',
-      status: 'Sắp đến hạn',
-      statusClass: 'bg-amber-50 text-amber-600',
-      date: '12/06/2025',
-      location: 'Mobile Clean Sài Gòn',
-      cost: 1200000,
-      package: 'Full Interior + Coating'
-    }
-  ];
-
-  // Filtering card list based on category and search query
+  // Filter category processing
   const filteredServices = services.filter(s => {
     const matchesCategory = filterCategory === 'Tất cả' || s.type === filterCategory;
     const matchesSearch = s.car.toLowerCase().includes(searchQuery.toLowerCase()) || 

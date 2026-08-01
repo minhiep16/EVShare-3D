@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { downloadContract } from '../services/api';
 
-const ContractPage = ({ currentUser }) => {
+const ContractPage = ({ currentUser, vehicle, coOwners }) => {
+  const currentVehicle = vehicle || { id: 1, model: 'Chưa có xe', licensePlate: 'N/A' };
+  const members = coOwners?.length > 0 ? coOwners : [];
   const [appendixSigned, setAppendixSigned] = useState(false);
   const [showViewer, setShowViewer] = useState(false);
 
@@ -18,8 +21,20 @@ const ContractPage = ({ currentUser }) => {
     }
   };
 
-  const handleDownload = () => {
-    alert('📥 Tải hợp đồng điện tử thành công dưới dạng PDF!');
+  const handleDownload = async () => {
+    try {
+      const blob = await downloadContract();
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `HopDong_EVShare_${currentUser?.id || 'User'}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    } catch (error) {
+      console.error('Download failed', error);
+      alert('❌ Lỗi khi tải hợp đồng điện tử. Vui lòng thử lại sau.');
+    }
   };
 
   return (
@@ -35,8 +50,8 @@ const ContractPage = ({ currentUser }) => {
               <span className="text-xs font-semibold text-[#22c55e] bg-[#22c55e]/20 px-2.5 py-1 rounded-full">
                 ● Đang hiệu lực
               </span>
-              <h2 className="text-xl font-bold mt-2">HĐ Đồng sở hữu Tesla Model 3</h2>
-              <p className="text-slate-400 text-sm mt-1">Số HĐ: EVC-2025-001 · Ký ngày 01/01/2025</p>
+              <h2 className="text-xl font-bold mt-2">HĐ Đồng sở hữu {currentVehicle.model}</h2>
+              <p className="text-slate-400 text-sm mt-1">Số HĐ: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')} · Ký ngày 01/01/2025</p>
             </div>
             <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
               <i className="ph ph-file-text text-3xl text-[#22c55e]"></i>
@@ -50,11 +65,11 @@ const ContractPage = ({ currentUser }) => {
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-400 mb-1">Biển số xe</p>
-              <p className="font-semibold text-sm sm:text-base">51G-888.99</p>
+              <p className="font-semibold text-sm sm:text-base">{currentVehicle.licensePlate}</p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-400 mb-1">Số thành viên</p>
-              <p className="font-semibold text-sm sm:text-base">3 người</p>
+              <p className="font-semibold text-sm sm:text-base">{members.length || 3} người</p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-400 mb-1">Loại hợp đồng</p>
@@ -65,27 +80,17 @@ const ContractPage = ({ currentUser }) => {
           <div className="mb-5">
             <p className="text-xs text-slate-400 uppercase tracking-wide font-medium mb-3">Bên ký kết</p>
             <div className="flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
-                <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg" className="w-7 h-7 rounded-full object-cover" />
-                <div>
-                  <p className="text-xs font-semibold">Nguyễn Thị Mai</p>
-                  <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · 40%</p>
+              {members.length > 0 ? members.map((member) => (
+                <div key={member.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
+                  <img src={member.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover" />
+                  <div>
+                    <p className="text-xs font-semibold">{member.name}</p>
+                    <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · {member.ownershipPercentage}%</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
-                <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" className="w-7 h-7 rounded-full object-cover" />
-                <div>
-                  <p className="text-xs font-semibold">Trần Văn Bình</p>
-                  <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · 30%</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
-                <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-7 h-7 rounded-full object-cover" />
-                <div>
-                  <p className="text-xs font-semibold">Lê Minh Tuấn</p>
-                  <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · 30%</p>
-                </div>
-              </div>
+              )) : (
+                <div className="text-sm text-slate-400">Đang cập nhật thành viên...</div>
+              )}
             </div>
           </div>
 
@@ -129,29 +134,29 @@ const ContractPage = ({ currentUser }) => {
                       {appendixSigned ? '✓ Đã ký' : '⏳ Chờ ký'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">Số: EVC-2025-001-A1 · Tạo ngày 05/06/2025</p>
+                  <p className="text-xs text-slate-400 mb-2">Số: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')}-A1 · Tạo ngày 05/06/2025</p>
                   <p className="text-sm text-slate-600 leading-relaxed">
-                    Điều chỉnh tỉ lệ sở hữu sau khi T.V.Bình chuyển nhượng 5% cho L.M.Tuấn. Tỉ lệ mới: Mai 40%, Bình 25%, Tuấn 35%.
+                    Điều chỉnh tỉ lệ sở hữu và cập nhật danh sách thành viên mới nhất của nhóm xe.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
                 <div className="flex items-center gap-4 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg" className="w-6 h-6 rounded-full object-cover ring-2 ring-[#22c55e]" />
-                    <span className="text-[11px] text-[#16a34a] font-semibold">✓ Ký rồi</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" className={`w-6 h-6 rounded-full object-cover ring-2 ${appendixSigned ? 'ring-[#22c55e]' : 'ring-amber-400'}`} />
-                    <span className={`text-[11px] font-semibold ${appendixSigned ? 'text-[#16a34a]' : 'text-amber-600'}`}>
-                      {appendixSigned ? '✓ Ký rồi' : '⏳ Chờ'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg" className="w-6 h-6 rounded-full object-cover ring-2 ring-slate-300" />
-                    <span className="text-[11px] text-slate-400 font-semibold">Chưa xem</span>
-                  </div>
+                  {members.map((m, idx) => (
+                    <div key={m.id} className="flex items-center gap-2">
+                      <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className={`w-6 h-6 rounded-full object-cover ring-2 ${
+                        idx === 0 || (idx === 1 && appendixSigned) ? 'ring-[#22c55e]' : 
+                        idx === 1 ? 'ring-amber-400' : 'ring-slate-300'
+                      }`} />
+                      <span className={`text-[11px] font-semibold ${
+                        idx === 0 || (idx === 1 && appendixSigned) ? 'text-[#16a34a]' : 
+                        idx === 1 ? 'text-amber-600' : 'text-slate-400'
+                      }`}>
+                        {idx === 0 || (idx === 1 && appendixSigned) ? '✓ Ký rồi' : idx === 1 ? '⏳ Chờ' : 'Chưa xem'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex gap-2">
@@ -268,38 +273,28 @@ const ContractPage = ({ currentUser }) => {
                 {appendixSigned ? 'Phụ lục A1 đã ký đầy đủ' : 'Phụ lục A1 đang chờ ký'}
               </p>
               <p className="text-[11px] text-slate-400">
-                {appendixSigned ? '05/06/2025 · 2/3 đã ký' : '05/06/2025 · 1/3 đã ký'}
+                {appendixSigned ? `Hôm nay · ${members.length}/${members.length} đã ký` : `Hôm nay · 1/${members.length} đã ký`}
               </p>
             </div>
 
             <div className="relative">
               <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
               <p className="text-xs font-semibold text-ink">HĐ chính thức có hiệu lực</p>
-              <p className="text-[11px] text-slate-400">01/01/2025 · Cả 3 bên đã ký</p>
+              <p className="text-[11px] text-slate-400">Gần đây · Đã ký</p>
             </div>
 
-            <div className="relative">
-              <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
-              <p className="text-xs font-semibold text-ink">Lê Minh Tuấn ký</p>
-              <p className="text-[11px] text-slate-400">31/12/2024 · eSign xác nhận</p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
-              <p className="text-xs font-semibold text-ink">Trần Văn Bình ký</p>
-              <p className="text-[11px] text-slate-400">30/12/2024 · eSign xác nhận</p>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
-              <p className="text-xs font-semibold text-ink">Nguyễn Thị Mai ký (Admin)</p>
-              <p className="text-[11px] text-slate-400">29/12/2024 · eSign xác nhận</p>
-            </div>
+            {members.map((m, idx) => (
+              <div key={`sign-${m.id}`} className="relative">
+                <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
+                <p className="text-xs font-semibold text-ink">{m.name} ký</p>
+                <p className="text-[11px] text-slate-400">eSign xác nhận</p>
+              </div>
+            ))}
 
             <div className="relative">
               <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-200 border-2 border-white shadow-sm"></div>
               <p className="text-xs font-semibold text-ink font-medium">HĐ được tạo & gửi</p>
-              <p className="text-[11px] text-slate-400">15/12/2024 · EVShare Staff</p>
+              <p className="text-[11px] text-slate-400">EVShare Staff</p>
             </div>
           </div>
         </div>
@@ -346,7 +341,7 @@ const ContractPage = ({ currentUser }) => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
             <div className="h-14 border-b border-slate-100 px-6 flex items-center justify-between shrink-0">
-              <h3 className="font-bold text-ink text-base">HĐ_DONG_SO_HUU_TESLA_MODEL_3.pdf</h3>
+              <h3 className="font-bold text-ink text-base">HĐ_DONG_SO_HUU_{currentVehicle.model.toUpperCase().replace(/\s+/g, '_')}.pdf</h3>
               <button 
                 onClick={() => setShowViewer(false)}
                 className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 text-lg transition-colors cursor-pointer"
@@ -362,41 +357,35 @@ const ContractPage = ({ currentUser }) => {
                 <div className="w-40 h-[1.5px] bg-slate-400 mx-auto -mt-4"></div>
                 
                 <h3 className="text-center font-bold text-base text-slate-900 uppercase pt-4">HỢP ĐỒNG ĐỒNG SỞ HỮU XE Ô TÔ ĐIỆN</h3>
-                <p className="text-center text-xs text-slate-400 -mt-2">Số: EVC-2025-001</p>
+                <p className="text-center text-xs text-slate-400 -mt-2">Số: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')}</p>
                 
                 <p className="indent-8 text-justify">
-                  Hôm nay, ngày 01 tháng 01 năm 2025, tại TP. Hồ Chí Minh, chúng tôi gồm có các bên cùng tham gia ký hợp đồng đồng sở hữu tài sản chung xe ô tô điện hiệu Tesla Model 3 dưới sự hỗ trợ điều hành quản lý của nền tảng EVShare:
+                  Hôm nay, ngày 01 tháng 01 năm 2025, tại TP. Hồ Chí Minh, chúng tôi gồm có các bên cùng tham gia ký hợp đồng đồng sở hữu tài sản chung xe ô tô điện hiệu {currentVehicle.model} dưới sự hỗ trợ điều hành quản lý của nền tảng EVShare:
                 </p>
 
                 <div className="space-y-1">
-                  <p><strong>Bên A (Thành viên sáng lập):</strong> Bà Nguyễn Thị Mai - CMND/CCCD: 079xxxxxxxxx - Sở hữu 40%.</p>
-                  <p><strong>Bên B (Thành viên góp vốn):</strong> Ông Trần Văn Bình - CMND/CCCD: 082xxxxxxxxx - Sở hữu 30%.</p>
-                  <p><strong>Bên C (Thành viên góp vốn):</strong> Ông Lê Minh Tuấn - CMND/CCCD: 091xxxxxxxxx - Sở hữu 30%.</p>
+                  {members.map((m, idx) => (
+                    <p key={m.id}><strong>Bên {String.fromCharCode(65 + idx)} (Thành viên góp vốn):</strong> Ông/Bà {m.name} - Sở hữu {m.ownershipPercentage}%.</p>
+                  ))}
                 </div>
 
                 <div className="space-y-2">
                   <p className="font-bold text-slate-900">ĐIỀU 1: TÀI SẢN ĐỒNG SỞ HỮU</p>
-                  <p className="indent-8 text-justify">Tài sản đồng sở hữu là xe ô tô điện 5 chỗ ngồi, nhãn hiệu TESLA Model 3, màu sơn Xanh lục metallic. Biển kiểm soát đăng ký: 51G-888.99. Giá trị tài sản góp vốn mua xe bao gồm cả chi phí lắp đặt cổng sạc.</p>
+                  <p className="indent-8 text-justify">Tài sản đồng sở hữu là xe ô tô điện 5 chỗ ngồi, nhãn hiệu {currentVehicle.model}. Biển kiểm soát đăng ký: {currentVehicle.licensePlate}. Giá trị tài sản góp vốn mua xe bao gồm cả chi phí lắp đặt cổng sạc.</p>
                 </div>
 
                 <div className="space-y-2">
                   <p className="font-bold text-slate-900">ĐIỀU 2: TỈ LỆ SỬ DỤNG VÀ CHI PHÍ</p>
-                  <p className="indent-8 text-justify">Các bên thống nhất phân bổ giờ đặt lịch và quãng đường di chuyển mỗi tháng tương ứng chính xác theo tỉ lệ sở hữu cổ phần của từng thành viên. Chi phí vận hành phát sinh (sạc điện, rửa xe) tự chi trả theo quãng đường đi thực tế. Chi phí cố định (bảo hiểm xe, đăng kiểm định kỳ, khấu hao pin) chia sẻ tương ứng với tỉ lệ 40% - 30% - 30% đóng vào Quỹ chung định kỳ.</p>
+                  <p className="indent-8 text-justify">Các bên thống nhất phân bổ giờ đặt lịch và quãng đường di chuyển mỗi tháng tương ứng chính xác theo tỉ lệ sở hữu cổ phần của từng thành viên. Chi phí vận hành phát sinh (sạc điện, rửa xe) tự chi trả theo quãng đường đi thực tế. Chi phí cố định (bảo hiểm xe, đăng kiểm định kỳ, khấu hao pin) chia sẻ tương ứng với tỉ lệ {members.map(m => m.ownershipPercentage + '%').join(' - ')} đóng vào Quỹ chung định kỳ.</p>
                 </div>
 
-                <div className="pt-8 flex justify-between text-xs text-slate-500 font-sans italic">
-                  <div className="text-center">
-                    <p className="font-bold not-italic">Đã Ký eSign ✓</p>
-                    <p className="mt-1">Nguyễn Thị Mai</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold not-italic">Đã Ký eSign ✓</p>
-                    <p className="mt-1">Trần Văn Bình</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold not-italic">Đã Ký eSign ✓</p>
-                    <p className="mt-1">Lê Minh Tuấn</p>
-                  </div>
+                <div className="pt-8 flex justify-around text-xs text-slate-500 font-sans italic flex-wrap gap-4">
+                  {members.map(m => (
+                    <div key={m.id} className="text-center">
+                      <p className="font-bold not-italic">Đã Ký eSign ✓</p>
+                      <p className="mt-1">{m.name}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
