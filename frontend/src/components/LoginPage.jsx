@@ -33,7 +33,9 @@ const LoginPage = ({ onLoginSuccess }) => {
     }
 
     try {
-      const matchedUser = await apiLogin(u, p);
+      const authResponse = await apiLogin(u, p);
+      localStorage.setItem('evshare_jwt_token', authResponse.token);
+      const matchedUser = authResponse.user;
       onLoginSuccess(matchedUser.role, {
         id: matchedUser.id,
         fullName: matchedUser.name,
@@ -80,7 +82,9 @@ const LoginPage = ({ onLoginSuccess }) => {
     };
 
     try {
-      const savedUser = await apiRegister(userData);
+      const authResponse = await apiRegister(userData);
+      localStorage.setItem('evshare_jwt_token', authResponse.token);
+      const savedUser = authResponse.user;
       alert(`🎉 Đăng ký tài khoản thành công cho ${savedUser.name} trên MySQL!\n\n` +
             `Thông tin đăng nhập:\n` +
             `• Tên đăng nhập: ${savedUser.username}\n` +

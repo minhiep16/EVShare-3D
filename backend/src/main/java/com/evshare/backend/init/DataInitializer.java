@@ -25,12 +25,24 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         // Only initialize if DB is empty
         if (userRepository.count() == 0) {
-            // 1. Users
+            // 1. Vehicle
+            Vehicle vehicle = Vehicle.builder()
+                    .model("Tesla Model 3")
+                    .licensePlate("51G-888.99")
+                    .batteryPercentage(78)
+                    .odometer(12400.0)
+                    .imageUrl("https://images.unsplash.com/photo-1560958089-b8a1929cea89?q=80&w=1200&auto=format&fit=crop")
+                    .jointFundBalance(15000000.0)
+                    .build();
+            vehicle = vehicleRepository.save(vehicle);
+
+            // 2. Users
             User mai = User.builder()
                     .name("Nguyễn Thị Mai")
                     .avatarUrl("https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
                     .role("USER")
                     .ownershipPercentage(40.0)
+                    .vehicle(vehicle)
                     .username("0912 345 678")
                     .phone("0912 345 678")
                     .email("mai@evshare.vn")
@@ -45,6 +57,7 @@ public class DataInitializer implements CommandLineRunner {
                     .avatarUrl("https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg")
                     .role("USER")
                     .ownershipPercentage(30.0)
+                    .vehicle(vehicle)
                     .username("0912222222")
                     .phone("0912222222")
                     .email("binh@evshare.vn")
@@ -59,6 +72,7 @@ public class DataInitializer implements CommandLineRunner {
                     .avatarUrl("https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-3.jpg")
                     .role("USER")
                     .ownershipPercentage(30.0)
+                    .vehicle(vehicle)
                     .username("0912333333")
                     .phone("0912333333")
                     .email("tuan@evshare.vn")
@@ -83,17 +97,6 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             userRepository.saveAll(List.of(mai, binh, tuan, admin));
-
-            // 2. Vehicle
-            Vehicle vehicle = Vehicle.builder()
-                    .model("Tesla Model 3")
-                    .licensePlate("51G-888.99")
-                    .batteryPercentage(78)
-                    .odometer(12400.0)
-                    .imageUrl("https://images.unsplash.com/photo-1560958089-b8a1929cea89?q=80&w=1200&auto=format&fit=crop")
-                    .jointFundBalance(15000000.0)
-                    .build();
-            vehicleRepository.save(vehicle);
 
             // 3. Bookings for June 2025
             Booking booking1 = Booking.builder()

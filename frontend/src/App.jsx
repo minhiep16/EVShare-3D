@@ -17,6 +17,7 @@ import AdminDisputes from './components/AdminDisputes';
 import AdminFinance from './components/AdminFinance';
 import AdminServices from './components/AdminServices';
 import LoginPage from './components/LoginPage';
+import VehicleCheckin3D from './components/VehicleCheckin3D';
 import { getDashboardData, createBooking, castVote } from './services/api';
 
 function App() {
@@ -40,6 +41,15 @@ function App() {
       setError(null);
     } catch (err) {
       console.error(err);
+      if (err.response?.status === 403 || err.response?.status === 401) {
+        setIsAuthenticated(false);
+        setCurrentUserInfo(null);
+        localStorage.removeItem('evshare_isAuthenticated');
+        localStorage.removeItem('evshare_currentRole');
+        localStorage.removeItem('evshare_currentUserInfo');
+        localStorage.removeItem('evshare_jwt_token');
+        return;
+      }
       setError('Không thể kết nối đến máy chủ. Vui lòng đảm bảo backend đang chạy và cơ sở dữ liệu đã được khởi động.');
     } finally {
       setLoading(false);
@@ -131,13 +141,15 @@ function App() {
   }
 
   // User and Admin Profiles
-  const userProfile = data?.coOwners?.find(u => u.name.includes('Mai')) || data?.coOwners?.[0];
   const activeUser = currentUserInfo ? {
-    id: currentUserInfo.id || (currentUserInfo.fullName?.includes('Bình') ? 2 : (currentUserInfo.fullName?.includes('Tuấn') ? 3 : 1)),
+    id: currentUserInfo.id,
     name: currentUserInfo.fullName,
     avatarUrl: currentUserInfo.avatarUrl || (currentRole === 'ADMIN' ? 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg' : 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg'),
     role: currentRole === 'ADMIN' ? 'Administrator' : 'Co-owner'
   } : null;
+
+  // Find the exact profile from the backend data using activeUser.id
+  const userProfile = activeUser ? data?.coOwners?.find(u => u.id === activeUser.id) : data?.coOwners?.[0];
 
   const currentUser = activeUser || (currentRole === 'USER' ? {
     id: userProfile?.id || 1,
@@ -177,6 +189,7 @@ function App() {
           localStorage.removeItem('evshare_isAuthenticated');
           localStorage.removeItem('evshare_currentRole');
           localStorage.removeItem('evshare_currentUserInfo');
+          localStorage.removeItem('evshare_jwt_token');
         }}
       />
 
@@ -341,6 +354,10 @@ function App() {
 
             {activeTab === 'admin_dashboard' && (
               <AdminDashboard />
+            )}
+
+            {activeTab === 'admin_checkin' && (
+              <VehicleCheckin3D />
             )}
 
             {activeTab === 'admin_disputes' && (

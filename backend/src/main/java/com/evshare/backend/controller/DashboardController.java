@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -18,7 +19,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class DashboardController {
 
@@ -30,7 +30,8 @@ public class DashboardController {
     private final SuggestionRepository suggestionRepository;
 
     @GetMapping("/dashboard")
-    public ResponseEntity<DashboardDTO> getDashboard(@RequestParam(required = false) Long userId) {
+    public ResponseEntity<DashboardDTO> getDashboard(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
         User loggedUser = null;
         if (userId != null) {
             loggedUser = userRepository.findById(userId).orElse(null);
@@ -41,20 +42,22 @@ public class DashboardController {
             return ResponseEntity.badRequest().build();
         }
 
-        boolean isCoOwner = loggedUser.getOwnershipPercentage() != null && loggedUser.getOwnershipPercentage() > 0;
+        boolean isCoOwner = loggedUser.getVehicle() != null && loggedUser.getOwnershipPercentage() != null && loggedUser.getOwnershipPercentage() > 0;
 
         var vehicle = isCoOwner 
-                ? vehicleRepository.findAll().stream().findFirst().orElse(null)
+                ? loggedUser.getVehicle()
                 : null; // Brand new user has no vehicle yet
 
         var coOwners = isCoOwner
                 ? userRepository.findAll().stream()
-                        .filter(u -> u.getOwnershipPercentage() != null && u.getOwnershipPercentage() > 0)
+                        .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(vehicle.getId()))
                         .collect(Collectors.toList())
                 : List.of(loggedUser);
 
         var bookings = isCoOwner
-                ? bookingRepository.findAll()
+                ? bookingRepository.findAll().stream()
+                        .filter(b -> b.getVehicle() != null && b.getVehicle().getId().equals(vehicle.getId()))
+                        .collect(Collectors.toList())
                 : bookingRepository.findAll().stream()
                         .filter(b -> b.getUser() != null && b.getUser().getId().equals(userId))
                         .collect(Collectors.toList());
@@ -101,15 +104,19 @@ public class DashboardController {
     }
 
     @PostMapping("/bookings")
-    public ResponseEntity<Booking> createBooking(@RequestBody BookingRequest request) {
-        User user = userRepository.findById(request.getUserId())
-                .orElseGet(() -> userRepository.findAll().stream().findFirst().orElse(null));
+    public ResponseEntity<Booking> createBooking(@RequestBody BookingRequest bookingRequest, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+        
+        if (user == null) {
+            return ResponseEntity.badRequest().build();
+        }
 
         Booking booking = Booking.builder()
                 .user(user)
-                .startTime(request.getStartTime())
-                .endTime(request.getEndTime())
-                .purpose(request.getPurpose())
+                .startTime(bookingRequest.getStartTime())
+                .endTime(bookingRequest.getEndTime())
+                .purpose(bookingRequest.getPurpose())
                 .status(Booking.BookingStatus.PENDING)
                 .build();
 

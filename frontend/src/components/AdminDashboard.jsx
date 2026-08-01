@@ -1,10 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getUnassignedUsers, getAllVehicles, addMemberToVehicle } from '../services/api';
 
 const AdminDashboard = () => {
   const [disputes, setDisputes] = useState([
     { id: 1, group: 'Nhóm #EV-2025-005', priority: 'Ưu tiên cao', text: 'Tranh chấp lịch sử dụng: T.A.Khoa chiếm dụng giờ của N.T.Lan', bg: 'bg-red-50 border-red-100', textColors: 'text-red-800 text-red-700 bg-red-100', solved: false },
     { id: 2, group: 'Nhóm #EV-2024-018', priority: 'Vừa', text: 'Tranh chấp phân chia chi phí sửa chữa sau va chạm nhẹ', bg: 'bg-amber-50 border-amber-100', textColors: 'text-amber-800 text-amber-700 bg-amber-100', solved: false }
   ]);
+
+  const [unassignedUsers, setUnassignedUsers] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedVehicle, setSelectedVehicle] = useState('');
+  const [ownershipShare, setOwnershipShare] = useState('');
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const users = await getUnassignedUsers();
+      setUnassignedUsers(users);
+      const vehs = await getAllVehicles();
+      setVehicles(vehs);
+    } catch (err) {
+      console.error('Failed to fetch admin data', err);
+    }
+  };
+
+  const handleAssignMember = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !selectedVehicle || !ownershipShare) {
+      alert('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    
+    try {
+      await addMemberToVehicle(selectedVehicle, selectedUser, parseFloat(ownershipShare));
+      alert('Gán thành viên thành công!');
+      setSelectedUser('');
+      setSelectedVehicle('');
+      setOwnershipShare('');
+      fetchData(); // Refresh list
+    } catch (err) {
+      console.error(err);
+      alert('Có lỗi xảy ra khi gán thành viên');
+    }
+  };
 
   const handleSolveDispute = (id, groupName) => {
     setDisputes(prev => prev.map(d => d.id === id ? { ...d, solved: true } : d));
@@ -454,6 +496,78 @@ const AdminDashboard = () => {
         </div>
 
       </div>
+
+      {/* Member Assignment Section */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <i className="ph ph-user-plus text-blue-500 text-xl"></i>
+          <h3 className="text-base font-semibold text-ink">Gán Xe Cho Thành Viên Mới</h3>
+        </div>
+        
+        <form onSubmit={handleAssignMember} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold text-slate-500 mb-1">Thành viên chờ</label>
+            <select 
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="">-- Chọn thành viên --</option>
+              {unassignedUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.phone})</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold text-slate-500 mb-1">Nhóm Xe</label>
+            <select 
+              value={selectedVehicle}
+              onChange={(e) => setSelectedVehicle(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="">-- Chọn xe --</option>
+              {vehicles.map(v => (
+                <option key={v.id} value={v.id}>{v.model} ({v.licensePlate})</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex flex-col">
+            <label className="text-xs font-semibold text-slate-500 mb-1">% Cổ phần</label>
+            <div className="relative">
+              <input 
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={ownershipShare}
+                onChange={(e) => setOwnershipShare(e.target.value)}
+                placeholder="Nhập % cổ phần"
+                className="w-full px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+              />
+              <span className="absolute right-3 top-2 text-sm text-slate-400">%</span>
+            </div>
+          </div>
+          
+          <button 
+            type="submit"
+            disabled={unassignedUsers.length === 0}
+            className={`w-full py-2 rounded-lg text-sm font-semibold text-white transition-colors cursor-pointer ${
+              unassignedUsers.length === 0 ? 'bg-slate-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            Thêm Thành Viên
+          </button>
+        </form>
+        
+        {unassignedUsers.length === 0 && (
+          <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+            <i className="ph ph-check-circle text-green-500"></i> Hiện không có thành viên nào đang chờ gán nhóm.
+          </p>
+        )}
+      </div>
+
     </div>
   );
 };

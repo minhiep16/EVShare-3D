@@ -38,7 +38,10 @@ public class User {
 
     // Architecture additions
     private Double walletBalance = 0.0;
-    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    private Vehicle vehicle;
+
     @Enumerated(EnumType.STRING)
     private UserStatus status = UserStatus.ACTIVE;
 

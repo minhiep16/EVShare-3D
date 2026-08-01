@@ -2,6 +2,7 @@ package com.evshare.backend.controller;
 
 import com.evshare.backend.entity.User;
 import com.evshare.backend.repository.UserRepository;
+import com.evshare.backend.security.JwtUtil;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,11 +10,11 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
@@ -28,7 +29,8 @@ public class AuthController {
         if (matchedUserOpt.isPresent()) {
             User user = matchedUserOpt.get();
             if (user.getPassword().equals(password)) {
-                return ResponseEntity.ok(user);
+                String token = jwtUtil.generateToken(user.getUsername(), user.getId(), user.getRole());
+                return ResponseEntity.ok(new JwtResponse(token, user));
             }
         }
         return ResponseEntity.badRequest().body("Tên đăng nhập hoặc mật khẩu không chính xác!");
@@ -62,7 +64,8 @@ public class AuthController {
                 .build();
 
         User saved = userRepository.save(newUser);
-        return ResponseEntity.ok(saved);
+        String token = jwtUtil.generateToken(saved.getUsername(), saved.getId(), saved.getRole());
+        return ResponseEntity.ok(new JwtResponse(token, saved));
     }
 
     @Data
@@ -80,5 +83,16 @@ public class AuthController {
         private String gplx;
         private String password;
         private String role;
+    }
+
+    @Data
+    public static class JwtResponse {
+        private String token;
+        private User user;
+
+        public JwtResponse(String token, User user) {
+            this.token = token;
+            this.user = user;
+        }
     }
 }
