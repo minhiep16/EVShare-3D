@@ -13,25 +13,25 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String name;
     private String avatarUrl;
     private String role; // "USER" or "ADMIN"
     private Double ownershipPercentage;
-    
+
     // Credentials
     private String username;
     private String password;
-    
+
     // Contact information
     private String phone;
     private String email;
-    
+
     // Legal documents
     @Column(unique = true)
     private String cccd;
     private String gplx;
-    
+
     // Document scanner OCR resources
     private String cccdImageUrl;
     private String gplxImageUrl;

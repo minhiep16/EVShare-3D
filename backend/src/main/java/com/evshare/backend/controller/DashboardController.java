@@ -5,14 +5,19 @@ import com.evshare.backend.entity.Booking;
 import com.evshare.backend.entity.Vote;
 import com.evshare.backend.entity.User;
 import com.evshare.backend.entity.Transaction;
+import com.evshare.backend.entity.Vehicle;
 import com.evshare.backend.repository.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.servlet.http.HttpServletRequest;
+import com.evshare.backend.entity.FundTransaction;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +33,7 @@ public class DashboardController {
     private final TransactionRepository transactionRepository;
     private final VoteRepository voteRepository;
     private final SuggestionRepository suggestionRepository;
+    private final FundTransactionRepository fundTransactionRepository;
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardDTO> getDashboard(HttpServletRequest request) {
@@ -63,31 +69,39 @@ public class DashboardController {
                         .collect(Collectors.toList());
 
         var transactions = isCoOwner
-                ? transactionRepository.findAll()
+                ? transactionRepository.findByVehicleId(vehicle.getId())
                 : Collections.<Transaction>emptyList(); // New user has no transactions yet
 
         var activeVotes = isCoOwner
-                ? voteRepository.findAll()
+                ? voteRepository.findByVehicleId(vehicle.getId())
                 : Collections.<Vote>emptyList(); // New user has no votes yet
 
         var suggestions = isCoOwner
-                ? suggestionRepository.findAll()
+                ? suggestionRepository.findByVehicleId(vehicle.getId())
                 : Collections.<com.evshare.backend.entity.Suggestion>emptyList();
 
         // Calculate KPI
-        double totalCost = isCoOwner ? 2450000.0 : 0.0;
-        double drivenKm = isCoOwner ? 342.0 : 0.0;
+        double totalCost = 0.0;
+        if (isCoOwner && transactions != null) {
+            for (Transaction t : transactions) {
+                if ("OUT".equals(t.getType()) || t.getAmount() > 0) {
+                    totalCost += t.getAmount();
+                }
+            }
+        }
+        
+        double drivenKm = isCoOwner ? (vehicle.getOdometer() != null ? vehicle.getOdometer() : 0.0) : 0.0;
         int bookingCount = bookings.size();
-        double jointFund = isCoOwner ? 15800000.0 : 0.0;
+        double jointFund = isCoOwner ? (vehicle.getJointFundBalance() != null ? vehicle.getJointFundBalance() : 0.0) : 0.0;
 
         var kpi = DashboardDTO.KpiDTO.builder()
                 .totalCostThisMonth(totalCost)
-                .costChangePercentage(isCoOwner ? 12.0 : 0.0)
+                .costChangePercentage(0.0)
                 .drivenKmThisMonth(drivenKm)
-                .kmChangePercentage(isCoOwner ? 8.0 : 0.0)
+                .kmChangePercentage(0.0)
                 .bookingCountThisMonth(bookingCount)
                 .jointFundBalance(jointFund)
-                .jointFundStatus(isCoOwner ? "Ổn định" : "Chưa có quỹ")
+                .jointFundStatus(isCoOwner && jointFund > 0 ? "Ổn định" : "Chưa có quỹ")
                 .build();
 
         var dashboard = DashboardDTO.builder()
@@ -104,16 +118,37 @@ public class DashboardController {
     }
 
     @PostMapping("/bookings")
-    public ResponseEntity<Booking> createBooking(@RequestBody BookingRequest bookingRequest, HttpServletRequest request) {
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseEntity<?> createBooking(@RequestBody BookingRequest bookingRequest, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         User user = userRepository.findById(userId).orElse(null);
         
-        if (user == null) {
-            return ResponseEntity.badRequest().build();
+        if (user == null || user.getVehicle() == null) {
+            return ResponseEntity.badRequest().body("Bạn chưa có xe để đặt lịch.");
+        }
+
+        // 1. Lock the vehicle to prevent race conditions from other users booking the same vehicle
+        Vehicle vehicle = vehicleRepository.findByIdWithLock(user.getVehicle().getId()).orElse(null);
+        if (vehicle == null) {
+            return ResponseEntity.badRequest().body("Không tìm thấy xe.");
+        }
+
+        // 2. Check for overlapping bookings
+        List<Booking> overlaps = bookingRepository.findOverlappingBookings(vehicle.getId(), bookingRequest.getStartTime(), bookingRequest.getEndTime());
+        if (!overlaps.isEmpty()) {
+            return ResponseEntity.badRequest().body("Thời gian này đã có người đặt lịch.");
+        }
+
+        // 3. Check Quota (e.g. 1% ownership = 1.68 hours per week). Simplify by just checking against 33 hours for 20%
+        long hoursToBook = ChronoUnit.HOURS.between(bookingRequest.getStartTime(), bookingRequest.getEndTime());
+        double maxHoursAllowed = (user.getOwnershipPercentage() / 100.0) * 168.0; // 168 hours in a week
+        if (hoursToBook > maxHoursAllowed) {
+            return ResponseEntity.badRequest().body("Vượt quá số giờ cho phép dựa trên tỷ lệ sở hữu (" + maxHoursAllowed + " giờ/tuần).");
         }
 
         Booking booking = Booking.builder()
                 .user(user)
+                .vehicle(vehicle)
                 .startTime(bookingRequest.getStartTime())
                 .endTime(bookingRequest.getEndTime())
                 .purpose(bookingRequest.getPurpose())
@@ -125,20 +160,33 @@ public class DashboardController {
     }
 
     @PostMapping("/votes/{id}/cast")
-    public ResponseEntity<Vote> castVote(@PathVariable Long id) {
+    @Transactional
+    public ResponseEntity<?> castVote(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null || user.getOwnershipPercentage() == null) {
+            return ResponseEntity.badRequest().body("Bạn không có quyền biểu quyết.");
+        }
+
         Vote vote = voteRepository.findById(id).orElse(null);
         if (vote != null && "OPEN".equals(vote.getStatus())) {
-            vote.setAgreedCount(vote.getAgreedCount() + 1);
-            if (vote.getAgreedCount() >= vote.getTotalCount()) {
-                vote.setDescription("Nâng cấp pin xe – " + vote.getAgreedCount() + "/" + vote.getTotalCount() + " đồng ý (Hoàn thành)");
+            vote.setAgreedPercentage(vote.getAgreedPercentage() + user.getOwnershipPercentage());
+            
+            if (vote.getAgreedPercentage() >= 50.0) {
+                vote.setDescription(vote.getTitle() + " – Đã thông qua (" + vote.getAgreedPercentage() + "% đồng ý)");
                 vote.setStatus("CLOSED");
             } else {
-                vote.setDescription("Nâng cấp pin xe – " + vote.getAgreedCount() + "/" + vote.getTotalCount() + " đồng ý");
+                vote.setDescription(vote.getTitle() + " – " + vote.getAgreedPercentage() + "% đồng ý");
             }
             voteRepository.save(vote);
             return ResponseEntity.ok(vote);
         }
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.badRequest().body("Cuộc biểu quyết đã đóng hoặc không tồn tại.");
+    }
+
+    @GetMapping("/vehicles/{id}/transactions")
+    public ResponseEntity<List<FundTransaction>> getVehicleTransactions(@PathVariable Long id, HttpServletRequest request) {
+        return ResponseEntity.ok(fundTransactionRepository.findByVehicleIdOrderByTransactionDateDesc(id));
     }
 
     @Data

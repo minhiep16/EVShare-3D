@@ -16,7 +16,12 @@ public class Vote {
     
     private String title;
     private String description;
-    private Integer agreedCount;
-    private Integer totalCount;
+    private Double agreedPercentage = 0.0;
+    private Double totalPercentage = 100.0;
     private String status; // OPEN, CLOSED
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Vehicle vehicle;
 }

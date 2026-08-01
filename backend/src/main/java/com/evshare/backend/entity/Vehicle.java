@@ -13,20 +13,20 @@ public class Vehicle {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     private String model;
     private String licensePlate;
     private Integer batteryPercentage;
     private Double odometer;
-    
+
     @Enumerated(EnumType.STRING)
     private VehicleStatus status = VehicleStatus.AVAILABLE;
-    
+
     private String imageUrl;
-    
+
     // Architecture additions
     private Double jointFundBalance = 0.0;
-    
+
     @Version
     private Integer version = 0;
 

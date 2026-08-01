@@ -20,6 +20,9 @@ public class DataInitializer implements CommandLineRunner {
     private final TransactionRepository transactionRepository;
     private final VoteRepository voteRepository;
     private final SuggestionRepository suggestionRepository;
+    private final FundTransactionRepository fundTransactionRepository;
+    private final ServiceRecordRepository serviceRecordRepository;
+    private final DisputeRepository disputeRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -147,6 +150,7 @@ public class DataInitializer implements CommandLineRunner {
             // Bảo hiểm (20%) -> 1,470,000₫
             // Khác (10%) -> 735,000₫ (represented by Đăng kiểm 1.2M and Vệ sinh 375k in transaction log)
             Transaction t1 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("CHARGE")
                     .categoryName("Sạc điện")
                     .amount(1125000.0)
@@ -156,6 +160,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t2 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("MAINTENANCE")
                     .categoryName("Bảo dưỡng")
                     .amount(800000.0)
@@ -165,6 +170,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t3 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("INSURANCE")
                     .categoryName("Bảo hiểm")
                     .amount(700000.0)
@@ -174,6 +180,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t4 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("OTHER")
                     .categoryName("Đăng kiểm")
                     .amount(1200000.0)
@@ -183,6 +190,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t5 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("OTHER")
                     .categoryName("Vệ sinh xe")
                     .amount(375000.0)
@@ -192,6 +200,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t6 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("CHARGE")
                     .categoryName("Sạc điện")
                     .amount(950000.0)
@@ -202,6 +211,7 @@ public class DataInitializer implements CommandLineRunner {
 
             // Additional historic transactions to reach Q2 totals:
             Transaction t7 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("CHARGE")
                     .categoryName("Sạc điện")
                     .amount(1232500.0)
@@ -211,6 +221,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t8 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("MAINTENANCE")
                     .categoryName("Bảo dưỡng")
                     .amount(1037500.0)
@@ -220,6 +231,7 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
 
             Transaction t9 = Transaction.builder()
+                    .vehicle(vehicle)
                     .type("INSURANCE")
                     .categoryName("Bảo hiểm")
                     .amount(770000.0)
@@ -232,34 +244,76 @@ public class DataInitializer implements CommandLineRunner {
 
             // 5. Votes
             Vote vote = Vote.builder()
+                    .vehicle(vehicle)
                     .title("Nâng cấp pin xe")
                     .description("Nâng cấp pin xe – 2/3 đồng ý")
-                    .agreedCount(2)
-                    .totalCount(3)
+                    .agreedPercentage(40.0)
+                    .totalPercentage(100.0)
                     .status("OPEN")
                     .build();
             voteRepository.save(vote);
 
             // 6. Suggestions
             Suggestion s1 = Suggestion.builder()
+                    .vehicle(vehicle)
                     .content("Bạn đang sử dụng 12% ít hơn tỉ lệ sở hữu (40%). Bạn có thể đặt thêm 2 chuyến trong tháng này.")
                     .type("INFO")
                     .iconClass("ph-chart-line-up")
                     .build();
 
             Suggestion s2 = Suggestion.builder()
+                    .vehicle(vehicle)
                     .content("Chi phí sạc điện tháng này cao hơn 15% so với tháng trước. Cân nhắc sạc vào khung giờ thấp điểm.")
                     .type("WARNING")
                     .iconClass("ph-warning-circle")
                     .build();
 
             Suggestion s3 = Suggestion.builder()
+                    .vehicle(vehicle)
                     .content("Quỹ bảo dưỡng đang đủ cho 2 lần bảo dưỡng tới. Nhắc nhở ngày hạn để tránh phí phạt.")
                     .type("SUCCESS")
                     .iconClass("ph-piggy-bank")
                     .build();
 
             suggestionRepository.saveAll(List.of(s1, s2, s3));
+            
+            // 7. FundTransactions
+            fundTransactionRepository.save(FundTransaction.builder()
+                .vehicle(vehicle)
+                .type("IN")
+                .title("Nạp quỹ định kỳ")
+                .amount(5000000.0)
+                .transactionDate(LocalDateTime.now().minusDays(5))
+                .build());
+
+            fundTransactionRepository.save(FundTransaction.builder()
+                .vehicle(vehicle)
+                .type("OUT")
+                .title("Sạc pin tại trạm")
+                .amount(120000.0)
+                .transactionDate(LocalDateTime.now().minusDays(1))
+                .build());
+
+            // 8. ServiceRecord
+            serviceRecordRepository.save(ServiceRecord.builder()
+                .vehicle(vehicle)
+                .serviceType("Bảo dưỡng")
+                .description("Bảo dưỡng định kỳ 10,000km")
+                .cost(3200000.0)
+                .status("PENDING")
+                .scheduledDate(LocalDateTime.now().plusDays(3))
+                .build());
+
+            // 9. Dispute
+            disputeRepository.save(Dispute.builder()
+                .vehicle(vehicle)
+                .title("Trầy xước cản trước")
+                .description("Phát hiện xước cản trước sau ca sử dụng của anh Bình")
+                .status("OPEN")
+                .priority("HIGH")
+                .createdAt(LocalDateTime.now())
+                .createdBy(mai)
+                .build());
         }
     }
 }

@@ -33,6 +33,21 @@ public class AdminController {
         return ResponseEntity.ok(vehicleRepository.findAll());
     }
 
+    @GetMapping("/vehicle-groups")
+    public ResponseEntity<List<VehicleGroupDto>> getVehicleGroups() {
+        List<Vehicle> vehicles = vehicleRepository.findAll();
+        List<User> allUsers = userRepository.findAll();
+        
+        List<VehicleGroupDto> groups = vehicles.stream().map(v -> {
+            List<User> members = allUsers.stream()
+                    .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(v.getId()))
+                    .collect(Collectors.toList());
+            return new VehicleGroupDto(v, members);
+        }).collect(Collectors.toList());
+        
+        return ResponseEntity.ok(groups);
+    }
+
     @PostMapping("/vehicles/{vehicleId}/add-member")
     public ResponseEntity<?> addMemberToVehicle(@PathVariable Long vehicleId, @RequestBody AddMemberRequest request) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
@@ -54,9 +69,42 @@ public class AdminController {
         return ResponseEntity.ok("User added to vehicle successfully");
     }
 
+    @PostMapping("/vehicles")
+    public ResponseEntity<?> createVehicle(@RequestBody CreateVehicleRequest request) {
+        Vehicle vehicle = Vehicle.builder()
+                .model(request.getModel())
+                .licensePlate(request.getLicensePlate())
+                .imageUrl(request.getImageUrl())
+                .batteryPercentage(100)
+                .odometer(0.0)
+                .status(Vehicle.VehicleStatus.AVAILABLE)
+                .jointFundBalance(0.0)
+                .build();
+        Vehicle savedVehicle = vehicleRepository.save(vehicle);
+        return ResponseEntity.ok(savedVehicle);
+    }
+
     @Data
     public static class AddMemberRequest {
         private Long userId;
         private Double ownershipPercentage;
+    }
+
+    @Data
+    public static class CreateVehicleRequest {
+        private String model;
+        private String licensePlate;
+        private String imageUrl;
+    }
+
+    @Data
+    public static class VehicleGroupDto {
+        private Vehicle vehicle;
+        private List<User> members;
+
+        public VehicleGroupDto(Vehicle vehicle, List<User> members) {
+            this.vehicle = vehicle;
+            this.members = members;
+        }
     }
 }

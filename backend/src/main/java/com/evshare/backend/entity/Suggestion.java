@@ -17,4 +17,9 @@ public class Suggestion {
     private String content;
     private String type; // INFO, WARNING, SUCCESS
     private String iconClass; // ph-chart-line-up, ph-warning-circle, etc.
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vehicle_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Vehicle vehicle;
 }

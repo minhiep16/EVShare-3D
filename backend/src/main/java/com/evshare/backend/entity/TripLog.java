@@ -13,19 +13,19 @@ public class TripLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @ManyToOne
     @JoinColumn(name = "booking_id")
     private Booking booking;
-    
+
     private Double startOdo;
     private Double endOdo;
     private Integer startBattery;
     private Integer endBattery;
-    
+
     @Column(columnDefinition = "JSON")
     private String damage3dJson;
-    
+
     @Enumerated(EnumType.STRING)
     private TripLogStatus status = TripLogStatus.COMPLETED;
 
