@@ -21,4 +21,16 @@ public class AdminDisputesController {
     public ResponseEntity<List<Dispute>> getAdminDisputes() {
         return ResponseEntity.ok(disputeRepository.findAllByOrderByCreatedAtDesc());
     }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/solve")
+    public ResponseEntity<?> solveDispute(@org.springframework.web.bind.annotation.PathVariable Long id, @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, String> request) {
+        Dispute dispute = disputeRepository.findById(id).orElse(null);
+        if (dispute != null) {
+            dispute.setStatus("RESOLVED");
+            dispute.setResolution(request.get("resolution"));
+            disputeRepository.save(dispute);
+            return ResponseEntity.ok(dispute);
+        }
+        return ResponseEntity.badRequest().body("Dispute not found");
+    }
 }

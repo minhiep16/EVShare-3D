@@ -86,6 +86,11 @@ export const getPendingServices = async () => {
   return response.data;
 };
 
+export const getCompletedServices = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/services/completed`);
+  return response.data;
+};
+
 export const getAdminDisputes = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/disputes`);
   return response.data;
@@ -93,5 +98,10 @@ export const getAdminDisputes = async () => {
 
 export const getVehicleTransactions = async (vehicleId) => {
   const response = await axios.get(`${API_BASE_URL}/vehicles/${vehicleId}/transactions`);
+  return response.data;
+};
+
+export const solveDispute = async (id, resolution) => {
+  const response = await axios.patch(`${API_BASE_URL}/admin/disputes/${id}/solve`, { resolution });
   return response.data;
 };

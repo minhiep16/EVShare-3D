@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAdminDisputes } from '../services/api';
+import { getAdminDisputes, solveDispute } from '../services/api';
 
 const AdminDisputes = () => {
   const [activeDisputes, setActiveDisputes] = useState([]);
@@ -48,7 +48,7 @@ const AdminDisputes = () => {
     fetchDisputes();
   }, []);
 
-  const handleResolveImmediately = (dispute) => {
+  const handleResolveImmediately = async (dispute) => {
     const choice = confirm(
       `⚖️ BẮT ĐẦU PHÂN GIẢI VỤ VIỆC #${dispute.id}:\n"${dispute.title}"\n\n` +
       `Bấm OK để phê duyệt phương án: Khấu trừ quỹ của bên có lỗi & bồi thường cho bên bị hại.\n` +
@@ -56,20 +56,28 @@ const AdminDisputes = () => {
     );
 
     if (choice) {
-      // Move to resolved disputes
-      const newResolved = {
-        id: dispute.id,
-        title: dispute.title,
-        car: dispute.car,
-        result: dispute.id === 'DS-9021' ? 'Bồi hoàn 500k & trừ 5đ uy tín' : 'Trích quỹ bảo dưỡng 1.2M',
-        date: 'Hôm nay',
-        staff: 'Phạm Quốc Hùng',
-        avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
-      };
+      try {
+        const resolution = 'Khấu trừ quỹ của bên có lỗi & bồi thường cho bên bị hại.';
+        await solveDispute(dispute.dbId, resolution);
+        
+        // Move to resolved disputes
+        const newResolved = {
+          id: dispute.id,
+          title: dispute.title,
+          car: dispute.car,
+          result: resolution,
+          date: new Date().toLocaleDateString('vi-VN'),
+          staff: 'Admin EVShare',
+          avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
+        };
 
-      setResolvedDisputes(prev => [newResolved, ...prev]);
-      setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
-      alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id}!`);
+        setResolvedDisputes(prev => [newResolved, ...prev]);
+        setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
+        alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id}!`);
+      } catch (err) {
+        console.error("Failed to solve dispute", err);
+        alert(`❌ Lỗi khi xử lý vụ việc #${dispute.id}.`);
+      }
     } else {
       alert(`🕵️ Vụ việc #${dispute.id} đã được chuyển sang bộ phận Điều tra & Xác minh vệ tinh.`);
     }

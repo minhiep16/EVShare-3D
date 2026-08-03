@@ -27,7 +27,7 @@ const CoOwners = ({ coOwners, activeVotes, onVoteClick }) => {
             />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">
-                {owner.name} 
+                {owner.name || owner.username} 
                 <span className={`ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                   owner.ownershipPercentage >= 40 ? 'text-brand-600 bg-brand-50' : 'text-slate-500 bg-slate-100'
                 }`}>

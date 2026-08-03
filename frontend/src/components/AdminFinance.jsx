@@ -41,6 +41,10 @@ const AdminFinance = () => {
     fetchData();
   }, []);
 
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value || 0);
+  };
+
   const filteredGroups = groupsFinance.filter(g => 
     g.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     g.car.toLowerCase().includes(searchQuery.toLowerCase()) ||

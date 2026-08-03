@@ -7,6 +7,17 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
   const [appendixSigned, setAppendixSigned] = useState(false);
   const [showViewer, setShowViewer] = useState(false);
 
+  // Dynamic Dates
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const startDateStr = `01/01/${currentYear}`;
+  const endDateStr = `01/01/${currentYear + 2}`;
+  const appendixDateStr = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${currentYear}`;
+  
+  const contractId = `EVC-${currentYear}-${currentVehicle.id?.toString().padStart(3, '0') || '001'}`;
+  const pastContractId = `EVC-${currentYear - 2}-005`;
+  const pastContractPeriod = `01/01/${currentYear - 2} – 31/12/${currentYear - 1}`;
+
   const handleSignAppendix = () => {
     if (appendixSigned) {
       alert('Phụ lục A1 đã được bạn ký điện tử thành công trước đó!');
@@ -51,7 +62,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                 ● Đang hiệu lực
               </span>
               <h2 className="text-xl font-bold mt-2">HĐ Đồng sở hữu {currentVehicle.model}</h2>
-              <p className="text-slate-400 text-sm mt-1">Số HĐ: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')} · Ký ngày 01/01/2025</p>
+              <p className="text-slate-400 text-sm mt-1">Số HĐ: {contractId} · Ký ngày {startDateStr}</p>
             </div>
             <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center shrink-0">
               <i className="ph ph-file-text text-3xl text-[#22c55e]"></i>
@@ -61,7 +72,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-400 mb-1">Hiệu lực đến</p>
-              <p className="font-semibold text-sm sm:text-base">01/01/2027</p>
+              <p className="font-semibold text-sm sm:text-base">{endDateStr}</p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-400 mb-1">Biển số xe</p>
@@ -84,7 +95,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                 <div key={member.id} className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
                   <img src={member.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover" />
                   <div>
-                    <p className="text-xs font-semibold">{member.name}</p>
+                    <p className="text-xs font-semibold">{member.name || member.username}</p>
                     <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · {member.ownershipPercentage}%</p>
                   </div>
                 </div>
@@ -134,7 +145,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                       {appendixSigned ? '✓ Đã ký' : '⏳ Chờ ký'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">Số: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')}-A1 · Tạo ngày 05/06/2025</p>
+                  <p className="text-xs text-slate-400 mb-2">Số: {contractId}-A1 · Tạo ngày {appendixDateStr}</p>
                   <p className="text-sm text-slate-600 leading-relaxed">
                     Điều chỉnh tỉ lệ sở hữu và cập nhật danh sách thành viên mới nhất của nhóm xe.
                   </p>
@@ -195,7 +206,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                     <h3 className="font-semibold text-ink">HĐ Đồng sở hữu VinFast VF8</h3>
                     <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Hết hạn</span>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2">Số: EVC-2023-005 · 01/01/2023 – 31/12/2024</p>
+                  <p className="text-xs text-slate-400 mb-2">Số: {pastContractId} · {pastContractPeriod}</p>
                   <p className="text-sm text-slate-500 leading-relaxed">
                     Hợp đồng đồng sở hữu xe VinFast VF8 đã kết thúc theo thỏa thuận của các bên sở hữu.
                   </p>
@@ -235,7 +246,9 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#16a34a]">CCCD đã xác minh ✓</p>
-                <p className="text-xs text-slate-500 truncate">079xxxxxxxx · Nguyễn Thị Mai</p>
+                <p className="text-xs text-slate-500 truncate">
+                  {currentUser?.cccd || '079xxxxxxxx'} · {currentUser?.name || currentUser?.username}
+                </p>
               </div>
             </div>
 
@@ -255,7 +268,9 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#16a34a]">Chữ ký số ✓</p>
-                <p className="text-xs text-slate-500">eSign ID: SIG-NTM-2025</p>
+                <p className="text-xs text-slate-500">
+                  eSign ID: SIG-{(currentUser?.name || currentUser?.username)?.substring(0, 3).toUpperCase()}-{currentYear}
+                </p>
               </div>
             </div>
           </div>
@@ -286,7 +301,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
             {members.map((m, idx) => (
               <div key={`sign-${m.id}`} className="relative">
                 <div className="absolute -left-[23px] top-1 w-4 h-4 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
-                <p className="text-xs font-semibold text-ink">{m.name} ký</p>
+                <p className="text-xs font-semibold text-ink">{m.name || m.username} ký</p>
                 <p className="text-[11px] text-slate-400">eSign xác nhận</p>
               </div>
             ))}
@@ -357,33 +372,33 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                 <div className="w-40 h-[1.5px] bg-slate-400 mx-auto -mt-4"></div>
                 
                 <h3 className="text-center font-bold text-base text-slate-900 uppercase pt-4">HỢP ĐỒNG ĐỒNG SỞ HỮU XE Ô TÔ ĐIỆN</h3>
-                <p className="text-center text-xs text-slate-400 -mt-2">Số: EVC-2025-{currentVehicle.id.toString().padStart(3, '0')}</p>
+                <p className="text-center text-xs text-slate-400 -mt-2">Số: {contractId}</p>
                 
                 <p className="indent-8 text-justify">
-                  Hôm nay, ngày 01 tháng 01 năm 2025, tại TP. Hồ Chí Minh, chúng tôi gồm có các bên cùng tham gia ký hợp đồng đồng sở hữu tài sản chung xe ô tô điện hiệu {currentVehicle.model} dưới sự hỗ trợ điều hành quản lý của nền tảng EVShare:
+                  Hôm nay, ngày {today.getDate().toString().padStart(2, '0')} tháng {(today.getMonth() + 1).toString().padStart(2, '0')} năm {today.getFullYear()}, tại TP. Hồ Chí Minh, chúng tôi gồm có các bên cùng tham gia ký hợp đồng đồng sở hữu tài sản chung xe ô tô điện hiệu {currentVehicle.model} dưới sự hỗ trợ điều hành quản lý của nền tảng EVShare:
                 </p>
 
                 <div className="space-y-1">
                   {members.map((m, idx) => (
-                    <p key={m.id}><strong>Bên {String.fromCharCode(65 + idx)} (Thành viên góp vốn):</strong> Ông/Bà {m.name} - Sở hữu {m.ownershipPercentage}%.</p>
+                    <p key={m.id}><strong>Bên {String.fromCharCode(65 + idx)} (Thành viên góp vốn):</strong> Ông/Bà {m.name || m.username} - Sở hữu {m.ownershipPercentage}%.</p>
                   ))}
                 </div>
 
                 <div className="space-y-2">
                   <p className="font-bold text-slate-900">ĐIỀU 1: TÀI SẢN ĐỒNG SỞ HỮU</p>
-                  <p className="indent-8 text-justify">Tài sản đồng sở hữu là xe ô tô điện 5 chỗ ngồi, nhãn hiệu {currentVehicle.model}. Biển kiểm soát đăng ký: {currentVehicle.licensePlate}. Giá trị tài sản góp vốn mua xe bao gồm cả chi phí lắp đặt cổng sạc.</p>
+                  <p className="indent-8 text-justify">Tài sản đồng sở hữu là xe ô tô điện, nhãn hiệu {currentVehicle.model}. Biển kiểm soát đăng ký: {currentVehicle.licensePlate}. Giá trị tài sản góp vốn mua xe bao gồm cả chi phí lắp đặt cổng sạc.</p>
                 </div>
 
                 <div className="space-y-2">
                   <p className="font-bold text-slate-900">ĐIỀU 2: TỈ LỆ SỬ DỤNG VÀ CHI PHÍ</p>
-                  <p className="indent-8 text-justify">Các bên thống nhất phân bổ giờ đặt lịch và quãng đường di chuyển mỗi tháng tương ứng chính xác theo tỉ lệ sở hữu cổ phần của từng thành viên. Chi phí vận hành phát sinh (sạc điện, rửa xe) tự chi trả theo quãng đường đi thực tế. Chi phí cố định (bảo hiểm xe, đăng kiểm định kỳ, khấu hao pin) chia sẻ tương ứng với tỉ lệ {members.map(m => m.ownershipPercentage + '%').join(' - ')} đóng vào Quỹ chung định kỳ.</p>
+                  <p className="indent-8 text-justify">Các bên thống nhất phân bổ giờ đặt lịch và quãng đường di chuyển mỗi tháng tương ứng chính xác theo tỉ lệ sở hữu cổ phần của từng thành viên. Chi phí vận hành phát sinh tự chi trả. Chi phí cố định chia sẻ tương ứng với tỉ lệ {members.map(m => m.ownershipPercentage + '%').join(' - ')} đóng vào Quỹ chung định kỳ.</p>
                 </div>
 
                 <div className="pt-8 flex justify-around text-xs text-slate-500 font-sans italic flex-wrap gap-4">
                   {members.map(m => (
                     <div key={m.id} className="text-center">
                       <p className="font-bold not-italic">Đã Ký eSign ✓</p>
-                      <p className="mt-1">{m.name}</p>
+                      <p className="mt-1">{m.name || m.username}</p>
                     </div>
                   ))}
                 </div>

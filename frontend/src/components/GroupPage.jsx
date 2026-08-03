@@ -1,27 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { getVehicleTransactions } from '../services/api';
 
-const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCast }) => {
-  const [votes, setVotes] = useState(initialVotes);
-  const [fundBalance, setFundBalance] = useState(15800000);
-  const [showAddMember, setShowAddMember] = useState(false);
+const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
   const [fundHistory, setFundHistory] = useState([]);
+  
+  // Use actual joint fund balance from vehicle
+  const fundBalance = currentUser?.vehicle?.jointFundBalance || 0;
   
   useEffect(() => {
     const fetchTransactions = async () => {
-      // User must be part of a vehicle
-      if (currentUser?.vehicle?.id || 1) {
+      if (currentUser?.vehicle?.id) {
         try {
-          const vehicleId = currentUser?.vehicle?.id || 1;
-          const data = await getVehicleTransactions(vehicleId);
-          // map FundTransaction entity to the component state
+          const data = await getVehicleTransactions(currentUser.vehicle.id);
           const history = data.map(t => ({
             type: t.type,
             title: t.title,
             desc: t.description || new Date(t.transactionDate).toLocaleDateString('vi-VN'),
             amount: t.type === 'OUT' ? -t.amount : t.amount
           }));
-          setFundHistory(history.slice(0, 5)); // show latest 5
+          setFundHistory(history.slice(0, 5));
         } catch (error) {
           console.error("Failed to fetch fund history", error);
         }
@@ -31,52 +28,27 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
   }, [currentUser]);
 
   const handleVote = async (voteId, agree) => {
-    // Call parents vote cast handler
-    if (onVoteCast) {
+    if (onVoteCast && agree) {
+      // For now, API only supports casting "Agree" (adding ownership percentage)
+      // Disagree is practically ignoring the vote until it expires.
       await onVoteCast(voteId);
+      alert('🗳️ Đã ghi nhận phiếu đồng ý của bạn!');
+    } else {
+      alert('❌ Đã ghi nhận phiếu từ chối!');
     }
-    
-    const updated = votes.map(v => {
-      if (v.id === voteId) {
-        // Here we simulate the update, real data should come from backend
-        // We assume current user has some percentage, for mock let's add 30%
-        const newAgreed = agree ? Math.min((v.agreedPercentage || 0) + 30.0, 100.0) : (v.agreedPercentage || 0);
-        const newStatus = newAgreed >= 50.0 ? 'CLOSED' : 'OPEN';
-        const newDesc = newAgreed >= 50.0 
-          ? `Nâng cấp pin xe – Đã thông qua (${newAgreed}% đồng ý)` 
-          : `Nâng cấp pin xe – ${newAgreed}% đồng ý`;
-
-        return {
-          ...v,
-          agreedPercentage: newAgreed,
-          status: newStatus,
-          description: newDesc
-        };
-      }
-      return v;
-    });
-    setVotes(updated);
-    alert(agree ? '🗳️ Bạn đã đồng ý đề xuất nâng cấp pin!' : '❌ Bạn đã từ chối đề xuất nâng cấp pin!');
   };
 
   const handleAddFund = () => {
-    const contribution = 3000000;
-    setFundBalance(prev => prev + contribution);
-    alert(`💰 Đã đóng góp thêm ${formatCurrency(contribution)} vào quỹ chung thành công!`);
+    alert(`💰 Vui lòng liên hệ Admin hệ thống để nạp quỹ bảo dưỡng cho xe ${currentUser?.vehicle?.model}.`);
   };
 
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value || 0);
   };
 
-  // Fund history is now dynamically fetched
-
-  // Static past votes matching mockup
-  const pastVotes = [
-    { id: 101, title: 'Gia hạn bảo hiểm VBI', desc: '3/3 đồng ý · 01/05/2025', approved: true },
-    { id: 102, title: 'Thêm dịch vụ vệ sinh hàng tháng', desc: '3/3 đồng ý · 15/04/2025', approved: true },
-    { id: 103, title: 'Bán xe, mua xe mới', desc: '1/3 đồng ý · 20/03/2025', approved: false }
-  ];
+  // Dynamically separate votes
+  const openVotes = (activeVotes || []).filter(v => v.status === 'OPEN');
+  const pastVotes = (activeVotes || []).filter(v => v.status === 'CLOSED');
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -87,16 +59,13 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-base font-semibold text-ink">Thành viên nhóm</h2>
-            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-medium">3/5 thành viên</span>
+            <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1 rounded-lg font-medium">{coOwners.length} thành viên</span>
           </div>
 
           {/* Member list rendering */}
           {coOwners.map((owner, idx) => {
             const isCurrentUser = currentUser?.id === owner.id;
             
-            // Generate some mock stats based on index since we don't have real data for these yet
-            const mockKms = ["342 km", "428 km", "285 km", "120 km", "50 km"];
-            const mockCosts = ["2,940,000₫", "2,205,000₫", "2,205,000₫ ⚠️", "850,000₫", "300,000₫"];
             const colors = [
               { colorClass: "text-[#22c55e]", circleColor: "#22c55e", strokeDash: "40 60" },
               { colorClass: "text-blue-500", circleColor: "#3b82f6", strokeDash: "30 70" },
@@ -105,8 +74,6 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
               { colorClass: "text-pink-500", circleColor: "#ec4899", strokeDash: "10 90" }
             ];
             
-            const km = mockKms[idx % mockKms.length];
-            const cost = mockCosts[idx % mockCosts.length];
             const colorProps = colors[idx % colors.length];
 
             return (
@@ -126,7 +93,7 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-semibold text-ink">{owner.name}</p>
+                    <p className="font-semibold text-ink">{owner.name || owner.username}</p>
                     {owner.ownershipPercentage >= 40 && (
                       <span className="text-[10px] font-semibold text-[#16a34a] bg-[#d1fae5] px-2 py-0.5 rounded-full">
                         Admin nhóm
@@ -140,23 +107,13 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                   </div>
                   
                   <p className="text-xs text-slate-500 mb-2">
-                    ID: MEM-{owner.id.toString().padStart(3, '0')} · Tham gia 01/01/2025
+                    ID: MEM-{owner.id.toString().padStart(3, '0')} · Số điện thoại: {owner.phone || 'Chưa cập nhật'}
                   </p>
                   
                   <div className="flex items-center gap-4">
                     <div>
                       <p className="text-[11px] text-slate-400">Tỉ lệ sở hữu</p>
                       <p className={`text-lg font-bold ${colorProps.colorClass}`}>{owner.ownershipPercentage}%</p>
-                    </div>
-                    <div className="w-px h-8 bg-slate-200"></div>
-                    <div>
-                      <p className="text-[11px] text-slate-400">Km tháng này</p>
-                      <p className="text-lg font-bold text-ink">{km}</p>
-                    </div>
-                    <div className="w-px h-8 bg-slate-200"></div>
-                    <div>
-                      <p className="text-[11px] text-slate-400">Chi phí TT</p>
-                      <p className="text-lg font-bold text-[#16a34a]">{cost}</p>
                     </div>
                   </div>
                 </div>
@@ -176,9 +133,11 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                     <button className="text-xs border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 text-slate-600 font-medium transition-colors cursor-pointer">
                       <i className="ph ph-chat-circle mr-1"></i>Nhắn tin
                     </button>
-                    <button className="text-xs border border-slate-200 px-2 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-200 text-slate-400 hover:text-red-500 transition-colors cursor-pointer">
-                      <i className="ph ph-user-minus"></i>
-                    </button>
+                    {currentUser?.ownershipPercentage >= 40 && (
+                      <button className="text-xs border border-slate-200 px-2 py-1.5 rounded-lg hover:bg-red-50 hover:border-red-200 text-slate-400 hover:text-red-500 transition-colors cursor-pointer">
+                        <i className="ph ph-user-minus"></i>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -207,7 +166,7 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
               return (
                 <div key={m.id} className={`${bgColors[idx % 3]} rounded-xl p-3 text-center`}>
                   <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-                  <p className="text-xs font-medium text-slate-600 mb-1">{m.name.split(' ').pop()}</p>
+                  <p className="text-xs font-medium text-slate-600 mb-1">{(m.name || m.username).split(' ').pop()}</p>
                   <p className={`text-sm font-bold ${textColors[idx % 3]}`}>{formatCurrency(fundBalance * (m.ownershipPercentage/100))}</p>
                   <p className="text-[10px] text-slate-400">{m.ownershipPercentage}%</p>
                 </div>
@@ -236,6 +195,9 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                 </span>
               </div>
             ))}
+            {fundHistory.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Chưa có giao dịch quỹ nào.</p>
+            )}
           </div>
           
           <button 
@@ -251,45 +213,37 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
       <div className="space-y-5">
         
         {/* Active Vote Card */}
-        {votes.map((vote) => {
-          const isClosed = vote.status === 'CLOSED';
+        {openVotes.map((vote) => {
           const votePercentage = vote.agreedPercentage || 0;
           
           return (
             <div 
               key={vote.id} 
-              className={`bg-white rounded-2xl border-2 shadow-sm p-5 ${isClosed ? 'border-slate-200' : 'border-amber-200'}`}
+              className={`bg-white rounded-2xl border-2 shadow-sm p-5 border-amber-200`}
             >
               <div className="flex items-center gap-2 mb-4">
-                <i className={`ph ${isClosed ? 'ph-check-circle text-brand-500' : 'ph-hand-pointing text-amber-500'} text-xl`}></i>
+                <i className={`ph ph-hand-pointing text-amber-500 text-xl`}></i>
                 <h3 className="text-base font-semibold text-ink">
-                  {isClosed ? 'Biểu quyết hoàn thành' : 'Bỏ phiếu đang mở'}
+                  Bỏ phiếu đang mở
                 </h3>
-                {!isClosed && (
-                  <span className="ml-auto text-[11px] text-red-500 bg-red-50 px-2 py-0.5 rounded-full font-medium">3 ngày còn lại</span>
-                )}
+                <span className="ml-auto text-[11px] text-red-500 bg-red-50 px-2 py-0.5 rounded-full font-medium">Cần xử lý</span>
               </div>
               
-              <div className={`${isClosed ? 'bg-slate-50' : 'bg-amber-50'} rounded-xl p-4 mb-4`}>
-                <p className={`text-sm font-semibold mb-1 ${isClosed ? 'text-slate-700' : 'text-amber-800'}`}>🔋 {vote.title}</p>
-                <p className={`text-xs leading-relaxed ${isClosed ? 'text-slate-500' : 'text-amber-700'}`}>
-                  Đề xuất thay pin LFP thế hệ mới để tăng quãng đường lên ~600km. Chi phí ước tính: <strong>45,000,000₫</strong>
+              <div className={`bg-amber-50 rounded-xl p-4 mb-4`}>
+                <p className={`text-sm font-semibold mb-1 text-amber-800`}>🗳️ {vote.title}</p>
+                <p className={`text-xs leading-relaxed text-amber-700`}>
+                  {vote.description}
                 </p>
               </div>
 
               {/* Vote status lists */}
               <div className="space-y-2 mb-4">
-                {coOwners.map((m, idx) => {
-                  const voted = isClosed || idx < 2; // Mock logic: first 2 users voted
+                {coOwners.map((m) => {
+                  const hasVoted = false; // Need explicit tracking backend if we want to show who voted, for now omit or show general
                   return (
                     <div key={m.id} className="flex items-center gap-3">
                       <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover shrink-0" />
-                      <p className="text-sm flex-1 text-ink">{m.name}</p>
-                      {voted ? (
-                        <span className="text-xs font-semibold text-[#16a34a] bg-[#ecfdf5] px-2 py-0.5 rounded-full">✓ Đồng ý</span>
-                      ) : (
-                        <span className="text-xs font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">⏳ Chưa bỏ phiếu</span>
-                      )}
+                      <p className="text-sm flex-1 text-ink">{m.name || m.username}</p>
                     </div>
                   );
                 })}
@@ -302,27 +256,24 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
                 ></div>
               </div>
               
-              
               <p className="text-xs text-slate-400 mb-4 font-medium">
-                {votePercentage}% đồng ý · {isClosed ? 'Đã thông qua' : 'Cần trên 50% để thông qua'}
+                {votePercentage}% đồng ý · Cần trên 50% để thông qua
               </p>
               
-              {!isClosed && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => handleVote(vote.id, true)}
-                    className="bg-[#22c55e] hover:bg-[#16a34a] text-white py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
-                  >
-                    Đồng ý
-                  </button>
-                  <button 
-                    onClick={() => handleVote(vote.id, false)}
-                    className="border border-red-200 text-red-500 hover:bg-red-50 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
-                  >
-                    Từ chối
-                  </button>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  onClick={() => handleVote(vote.id, true)}
+                  className="bg-[#22c55e] hover:bg-[#16a34a] text-white py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                >
+                  Đồng ý
+                </button>
+                <button 
+                  onClick={() => handleVote(vote.id, false)}
+                  className="border border-red-200 text-red-500 hover:bg-red-50 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                >
+                  Từ chối
+                </button>
+              </div>
             </div>
           );
         })}
@@ -331,30 +282,41 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
           <h3 className="text-base font-semibold mb-4 text-ink">Biểu quyết đã kết thúc</h3>
           <div className="space-y-3">
-            {pastVotes.map((v) => (
-              <div 
-                key={v.id} 
-                className={`flex items-start gap-3 p-3 rounded-xl border ${
-                  v.approved 
-                    ? 'bg-[#ecfdf5] border-[#22c55e]/20' 
-                    : 'bg-red-50 border-red-100'
-                }`}
-              >
-                {v.approved ? (
-                  <i className="ph ph-check-circle-fill text-[#22c55e] text-xl shrink-0 mt-0.5"></i>
-                ) : (
-                  <i className="ph ph-x-circle-fill text-red-400 text-xl shrink-0 mt-0.5"></i>
-                )}
-                <div>
-                  <p className="text-sm font-medium text-ink">{v.title}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{v.desc}</p>
+            {pastVotes.map((v) => {
+              const isApproved = v.agreedPercentage >= 50.0;
+              return (
+                <div 
+                  key={v.id} 
+                  className={`flex items-start gap-3 p-3 rounded-xl border ${
+                    isApproved 
+                      ? 'bg-[#ecfdf5] border-[#22c55e]/20' 
+                      : 'bg-red-50 border-red-100'
+                  }`}
+                >
+                  {isApproved ? (
+                    <i className="ph ph-check-circle-fill text-[#22c55e] text-xl shrink-0 mt-0.5"></i>
+                  ) : (
+                    <i className="ph ph-x-circle-fill text-red-400 text-xl shrink-0 mt-0.5"></i>
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-ink">{v.title}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{v.description}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+            {pastVotes.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">Chưa có biểu quyết nào.</p>
+            )}
           </div>
-          <button className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-slate-200 text-slate-600 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer">
-            <i className="ph ph-plus"></i>Tạo biểu quyết mới
-          </button>
+          {currentUser?.ownershipPercentage >= 40 && (
+            <button 
+              onClick={() => alert("Chức năng tạo biểu quyết mới đang được cập nhật.")}
+              className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-slate-200 text-slate-600 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <i className="ph ph-plus"></i>Tạo biểu quyết mới
+            </button>
+          )}
         </div>
 
         {/* AI group insights card */}
@@ -366,17 +328,12 @@ const GroupPage = ({ coOwners, activeVotes: initialVotes, currentUser, onVoteCas
           <div className="space-y-3">
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                {coOwners[1]?.name || 'Thành viên'} đang <span className="text-white font-semibold">sử dụng vượt 28%</span> so với tỉ lệ sở hữu. Cân nhắc điều chỉnh lịch ưu tiên.
+                Quỹ chung hiện tại là <span className="text-white font-semibold">{formatCurrency(fundBalance)}</span>, đủ chi trả cho đợt bảo dưỡng kế tiếp. Không cần nạp thêm trong tháng tới.
               </p>
             </div>
             <div className="bg-white/10 rounded-xl p-3">
               <p className="text-xs text-slate-300 leading-relaxed">
-                Quỹ chung đủ chi trả cho <span className="text-white font-semibold">2 lần bảo dưỡng</span> tiếp theo. Không cần nạp thêm trong tháng tới.
-              </p>
-            </div>
-            <div className="bg-white/10 rounded-xl p-3">
-              <p className="text-xs text-slate-300 leading-relaxed">
-                {coOwners[2]?.name || 'Thành viên'} chưa thanh toán chi phí sửa chữa nhỏ. Gợi ý <span className="text-white font-semibold">nhắc tự động</span> trước hạn 3 ngày.
+                Hãy duy trì tương tác và bỏ phiếu đúng hạn để giữ quyền lợi sử dụng ưu tiên cho mình.
               </p>
             </div>
           </div>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingServices } from '../services/api';
+import { getPendingServices, getCompletedServices } from '../services/api';
 
 const AdminServices = () => {
   const [filterCategory, setFilterCategory] = useState('Tất cả');
   const [searchQuery, setSearchQuery] = useState('');
   const [services, setServices] = useState([]);
+  const [historyLogs, setHistoryLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Interactive states for card tasks
@@ -15,8 +16,12 @@ const AdminServices = () => {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const data = await getPendingServices();
-        const mappedServices = data.map(s => ({
+        const [pendingData, completedData] = await Promise.all([
+          getPendingServices(),
+          getCompletedServices()
+        ]);
+        
+        const mappedServices = (pendingData || []).map(s => ({
           id: s.id,
           type: s.serviceType,
           title: s.description,
@@ -25,14 +30,25 @@ const AdminServices = () => {
           iconClass: s.serviceType === 'Sửa chữa' ? 'ph ph-warning text-red-600 bg-red-50' : 'ph ph-wrench text-blue-600 bg-blue-50',
           status: s.status,
           statusClass: s.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-blue-100 text-blue-700',
-          date: s.scheduledDate ? new Date(s.scheduledDate).toLocaleDateString('vi-VN') : 'N/A',
+          date: s.serviceDate ? new Date(s.serviceDate).toLocaleDateString('vi-VN') : 'N/A',
           location: 'Trạm EVShare',
           cost: s.cost || 0,
-          images: [] // Mock for now
+          images: []
         }));
         setServices(mappedServices);
+
+        const mappedHistory = (completedData || []).map(s => ({
+          id: `#SRV-${s.id.toString().padStart(4, '0')}`,
+          car: s.vehicle?.model || 'Unknown',
+          group: `Nhóm #EV-${s.vehicle?.id?.toString().padStart(3, '0')}`,
+          service: s.description,
+          date: s.serviceDate ? new Date(s.serviceDate).toLocaleDateString('vi-VN') : 'N/A',
+          cost: s.cost || 0,
+          staff: 'Hệ thống EVShare'
+        }));
+        setHistoryLogs(mappedHistory);
       } catch (err) {
-        console.error("Failed to fetch pending services", err);
+        console.error("Failed to fetch services", err);
       } finally {
         setLoading(false);
       }
@@ -43,7 +59,7 @@ const AdminServices = () => {
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
-  // Filter category processing
+  
   const filteredServices = services.filter(s => {
     const matchesCategory = filterCategory === 'Tất cả' || s.type === filterCategory;
     const matchesSearch = s.car.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -58,24 +74,17 @@ const AdminServices = () => {
       return;
     }
     setService1Status('Đang thực hiện');
-    alert('🔧 Bắt đầu thực hiện bảo dưỡng xe Tesla Model 3. Hệ thống đã cập nhật trạng thái hoạt động.');
+    alert('🔧 Bắt đầu thực hiện bảo dưỡng xe. Hệ thống đã cập nhật trạng thái hoạt động.');
   };
 
   const handleDispatchRescue = () => {
     if (truckDispatched) {
-      alert('🚒 Xe cứu hộ đang trên đường di chuyển đến vị trí BYD Atto 3.');
+      alert('🚒 Xe cứu hộ đang trên đường di chuyển đến vị trí xe.');
       return;
     }
     setTruckDispatched(true);
-    alert('🚒 Đã điều phối xe cứu hộ chuyên dụng 24/7 đến Quốc lộ 1A để kéo xe BYD Atto 3 về trung tâm kỹ thuật.');
+    alert('🚒 Đã điều phối xe cứu hộ chuyên dụng 24/7 đến để kéo xe về trung tâm kỹ thuật.');
   };
-
-  // Historic table logs
-  const historyLogs = [
-    { id: '#SRV-1092', car: 'Tesla Model 3', group: 'Nhóm #EV-2025-001', service: 'Bảo dưỡng 10,000km', date: '05/06/2025', cost: 2150000, staff: 'Staff: Minh Hoàng' },
-    { id: '#SRV-1085', car: 'VinFast VF9', group: 'Nhóm #EV-2025-002', service: 'Thay lốp (2 bánh trước)', date: '01/06/2025', cost: 8400000, staff: 'Staff: Tuấn Anh' },
-    { id: '#SRV-1081', car: 'Hyundai Ioniq 6', group: 'Nhóm #EV-2025-003', service: 'Vệ sinh hút bụi', date: '28/05/2025', cost: 200000, staff: 'Mobile Clean Sài Gòn' }
-  ];
 
   return (
     <div className="space-y-6">
@@ -101,10 +110,7 @@ const AdminServices = () => {
         {/* Simple indicators */}
         <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-500"></span> 5 Sắp đến hạn
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-500"></span> 2 Quá hạn
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span> {services.length} Đang chờ
           </div>
         </div>
       </div>
@@ -178,83 +184,18 @@ const AdminServices = () => {
                       {isUrgent ? 'Sự cố' : 'Dự chi'}
                     </span>
                     <span className={`font-bold ${isUrgent ? 'text-red-500' : 'text-slate-900'}`}>
-                      {isUrgent ? srv.issueType : formatCurrency(srv.cost)}
+                      {formatCurrency(srv.cost)}
                     </span>
                   </div>
                 </div>
 
-                {/* Sub info notifications inside card */}
-                {srv.admin && (
-                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center gap-3">
-                    <img src={srv.adminAvatar} className="w-8 h-8 rounded-full border border-white object-cover" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-slate-700 truncate">{srv.admin}</p>
-                      <p className="text-[9px] text-[#22c55e] font-semibold truncate">{srv.adminStatus}</p>
-                    </div>
-                    <i className="ph ph-check-circle-fill text-[#22c55e] text-lg"></i>
-                  </div>
-                )}
-
-                {srv.warningText && (
-                  <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 flex items-start gap-2.5">
-                    <i className="ph ph-warning-circle text-amber-500 text-lg shrink-0 mt-0.5"></i>
-                    <p className="text-[11px] text-amber-700 leading-relaxed font-medium">{srv.warningText}</p>
-                  </div>
-                )}
-
-                {isUrgent && (
-                  <div className="flex -space-x-2 pt-2">
-                    {srv.images.map((imgUrl, idx) => (
-                      <div 
-                        key={idx} 
-                        onClick={() => alert('🖼️ Hiển thị phóng to ảnh chụp chi tiết sự cố tại trạm cứu hộ.')}
-                        className="w-16 h-16 rounded-lg border-2 border-white overflow-hidden bg-slate-100 shadow-sm cursor-pointer hover:opacity-85 transition-opacity"
-                      >
-                        <img className="w-full h-full object-cover" src={imgUrl} alt="damage info" />
-                      </div>
-                    ))}
-                    <div className="w-16 h-16 rounded-lg border-2 border-white bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400">
-                      +1
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Card Footer Actions */}
               <div className={`p-3 flex gap-2 border-t ${
                 isUrgent ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-200'
               }`}>
-                {srv.id === 1 ? (
-                  <>
-                    <button 
-                      onClick={() => alert('🔍 Xem chi tiết lịch trình bảo dưỡng...')}
-                      className="flex-1 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      Chi tiết
-                    </button>
-                    <button 
-                      onClick={handleStartService1}
-                      className="flex-1 py-2 text-xs font-bold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors cursor-pointer"
-                    >
-                      {service1Status === 'Đang thực hiện' ? 'Đang xử lý...' : 'Bắt đầu thực hiện'}
-                    </button>
-                  </>
-                ) : srv.id === 2 ? (
-                  <>
-                    <button 
-                      onClick={() => alert('🔍 Xem chi tiết hồ sơ đăng kiểm...')}
-                      className="flex-1 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      Chi tiết
-                    </button>
-                    <button 
-                      onClick={() => alert('📅 Đã gửi yêu cầu đặt lịch đăng kiểm online tới Trạm 50-03S.')}
-                      className="flex-1 py-2 text-xs font-bold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors cursor-pointer"
-                    >
-                      Đặt lịch trạm
-                    </button>
-                  </>
-                ) : srv.id === 3 ? (
+                {isUrgent ? (
                   <>
                     <button 
                       onClick={() => alert('❌ Đã từ chối sự cố. Chuyển hồ sơ về cho Bảo hiểm làm việc.')}
@@ -272,16 +213,16 @@ const AdminServices = () => {
                 ) : (
                   <>
                     <button 
-                      onClick={() => alert('🔍 Xem quy chuẩn vệ sinh chuyên sâu Ioniq 6...')}
+                      onClick={() => alert('🔍 Xem chi tiết lịch trình bảo dưỡng...')}
                       className="flex-1 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       Chi tiết
                     </button>
                     <button 
-                      onClick={() => alert('🧼 Bắt đầu bàn giao xe cho đội vệ sinh Mobile Clean...')}
+                      onClick={handleStartService1}
                       className="flex-1 py-2 text-xs font-bold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors cursor-pointer"
                     >
-                      Giao xe
+                      Bắt đầu thực hiện
                     </button>
                   </>
                 )}
@@ -301,12 +242,6 @@ const AdminServices = () => {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-ink">Lịch sử dịch vụ gần đây</h3>
-          <button 
-            onClick={() => alert('📥 Đang tải báo cáo tài chính & dịch vụ kỹ thuật tháng 5 dạng PDF...')}
-            className="text-xs text-[#22c55e] font-semibold hover:text-[#16a34a] cursor-pointer"
-          >
-            Tải báo cáo tháng 5
-          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -342,21 +277,14 @@ const AdminServices = () => {
                   </td>
                 </tr>
               ))}
+              
+              {historyLogs.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="py-8 text-center text-slate-400">Không có lịch sử dịch vụ.</td>
+                </tr>
+              )}
             </tbody>
           </table>
-        </div>
-
-        {/* Pagination logs */}
-        <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-xs text-slate-400 font-medium">Hiển thị 3 / 48 dịch vụ</p>
-          <div className="flex gap-2">
-            <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50 cursor-pointer" disabled>
-              <i className="ph ph-caret-left"></i>
-            </button>
-            <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
-              <i className="ph ph-caret-right"></i>
-            </button>
-          </div>
         </div>
       </div>
 

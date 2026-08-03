@@ -21,4 +21,9 @@ public class AdminServicesController {
     public ResponseEntity<List<ServiceRecord>> getPendingServices() {
         return ResponseEntity.ok(serviceRecordRepository.findByStatus("PENDING"));
     }
+
+    @GetMapping("/completed")
+    public ResponseEntity<List<ServiceRecord>> getCompletedServices() {
+        return ResponseEntity.ok(serviceRecordRepository.findByStatus("COMPLETED"));
+    }
 }
