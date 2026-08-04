@@ -105,3 +105,31 @@ export const solveDispute = async (id, resolution) => {
   const response = await axios.patch(`${API_BASE_URL}/admin/disputes/${id}/solve`, { resolution });
   return response.data;
 };
+
+export const checkoutVehicle = async (vehicleId, data) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/vehicles/${vehicleId}/checkout`, data);
+  return response.data;
+};
+
+export const checkinVehicle = async (vehicleId, data) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/vehicles/${vehicleId}/checkin`, data);
+  return response.data;
+};
+
+export const createDispute = async (data) => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.post(`${API_BASE_URL}/disputes`, data, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getAdminCheckinLogs = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/checkin-logs`);
+  return response.data;
+};
+
+export const getUserCheckinLogs = async () => {
+  const response = await axios.get(`${API_BASE_URL}/checkin-logs`);
+  return response.data;
+};

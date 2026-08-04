@@ -5,24 +5,15 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "transactions", indexes = {
-        @Index(name = "idx_transaction_date", columnList = "date")
-})
+@Table(name = "checkin_logs")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Transaction {
+public class CheckinLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    private String type; // CHARGE, MAINTENANCE, INSURANCE, OTHER, REGISTRATION
-    private String categoryName; // "Phí sạc điện", "Bảo dưỡng", "Bảo hiểm", "Đăng kiểm", "Vệ sinh xe"
-    private Double amount;
-    private java.time.LocalDate date;
-    private String description;
-    private String status; // PAID, PENDING
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id")
@@ -34,6 +25,11 @@ public class Transaction {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private User user;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("vehicleId")
+    public Long getVehicleId() {
+        return vehicle != null ? vehicle.getId() : null;
+    }
+
     @com.fasterxml.jackson.annotation.JsonProperty("userId")
     public Long getUserId() {
         return user != null ? user.getId() : null;
@@ -43,4 +39,16 @@ public class Transaction {
     public String getUserName() {
         return user != null ? user.getName() : "Hệ thống";
     }
+
+    private String type; // CHECKIN or CHECKOUT
+    
+    private Integer batteryPercentage;
+    private Double odometer;
+    
+    @Column(columnDefinition = "TEXT")
+    private String damages; // JSON or simple string describing damages
+
+    private Double cost; // Calculated cost if CHECKIN
+
+    private LocalDateTime timestamp;
 }

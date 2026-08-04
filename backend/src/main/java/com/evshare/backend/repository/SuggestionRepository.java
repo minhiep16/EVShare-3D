@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface SuggestionRepository extends JpaRepository<Suggestion, Long> {
-    List<Suggestion> findByVehicleId(Long vehicleId);
+    List<Suggestion> findByVehicle_Id(Long vehicleId);
 }

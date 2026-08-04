@@ -34,6 +34,7 @@ public class DashboardController {
     private final VoteRepository voteRepository;
     private final SuggestionRepository suggestionRepository;
     private final FundTransactionRepository fundTransactionRepository;
+    private final CheckinLogRepository checkinLogRepository;
 
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardDTO> getDashboard(HttpServletRequest request) {
@@ -69,15 +70,15 @@ public class DashboardController {
                         .collect(Collectors.toList());
 
         var transactions = isCoOwner
-                ? transactionRepository.findByVehicleId(vehicle.getId())
-                : Collections.<Transaction>emptyList(); // New user has no transactions yet
+                ? transactionRepository.findByVehicle_Id(vehicle.getId())
+                : transactionRepository.findByUser_Id(userId);
 
         var activeVotes = isCoOwner
-                ? voteRepository.findByVehicleId(vehicle.getId())
+                ? voteRepository.findByVehicle_Id(vehicle.getId())
                 : Collections.<Vote>emptyList(); // New user has no votes yet
 
         var suggestions = isCoOwner
-                ? suggestionRepository.findByVehicleId(vehicle.getId())
+                ? suggestionRepository.findByVehicle_Id(vehicle.getId())
                 : Collections.<com.evshare.backend.entity.Suggestion>emptyList();
 
         // Calculate KPI
@@ -133,6 +134,10 @@ public class DashboardController {
             return ResponseEntity.badRequest().body("Không tìm thấy xe.");
         }
 
+        if (vehicle.getStatus() == Vehicle.VehicleStatus.IN_USE) {
+            return ResponseEntity.badRequest().body("Xe đang được sử dụng trên đường, không thể đặt lịch lúc này. Vui lòng chờ xe được trả về bãi!");
+        }
+
         // 2. Check for overlapping bookings
         List<Booking> overlaps = bookingRepository.findOverlappingBookings(vehicle.getId(), bookingRequest.getStartTime(), bookingRequest.getEndTime());
         if (!overlaps.isEmpty()) {
@@ -185,8 +190,37 @@ public class DashboardController {
     }
 
     @GetMapping("/vehicles/{id}/transactions")
-    public ResponseEntity<List<FundTransaction>> getVehicleTransactions(@PathVariable Long id, HttpServletRequest request) {
-        return ResponseEntity.ok(fundTransactionRepository.findByVehicleIdOrderByTransactionDateDesc(id));
+    public ResponseEntity<List<FundTransaction>> getFundTransactions(@PathVariable Long id) {
+        return ResponseEntity.ok(fundTransactionRepository.findByVehicle_IdOrderByTransactionDateDesc(id));
+    }
+
+    @PostMapping("/transactions/{id}/pay")
+    @Transactional(rollbackFor = Exception.class)
+    public ResponseEntity<?> payTransaction(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Transaction tx = transactionRepository.findById(id).orElse(null);
+        if (tx == null) return ResponseEntity.badRequest().body("Giao dịch không tồn tại.");
+        
+        if (tx.getUser() != null && !tx.getUser().getId().equals(userId)) {
+            return ResponseEntity.status(403).body("Không có quyền truy cập.");
+        }
+
+        if ("PAID".equals(tx.getStatus())) {
+            return ResponseEntity.badRequest().body("Giao dịch đã được thanh toán.");
+        }
+
+        tx.setStatus("PAID");
+        transactionRepository.save(tx);
+        return ResponseEntity.ok(tx);
+    }
+
+    @GetMapping("/checkin-logs")
+    public ResponseEntity<?> getUserCheckinLogs(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (userId == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        return ResponseEntity.ok(checkinLogRepository.findByUser_IdOrderByTimestampDesc(userId));
     }
 
     @Data

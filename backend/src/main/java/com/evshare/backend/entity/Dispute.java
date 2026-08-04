@@ -30,6 +30,9 @@ public class Dispute {
     @Column(columnDefinition = "TEXT")
     private String description;
     
+    @Column(columnDefinition = "TEXT")
+    private String resolution;
+    
     private String status; // "OPEN", "IN_PROGRESS", "RESOLVED"
     private String priority; // "HIGH", "MEDIUM", "LOW"
     

@@ -1,9 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getUserCheckinLogs } from '../services/api';
 
 const HistoryPage = ({ currentUser, bookings }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [period, setPeriod] = useState('month'); // month, quarter, year
+  const [logs, setLogs] = useState([]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const fetchLogs = async () => {
+    try {
+      const data = await getUserCheckinLogs();
+      setLogs(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -27,19 +42,55 @@ const HistoryPage = ({ currentUser, bookings }) => {
     };
   });
 
-  // Calculate dynamic KPIs
-  const totalTripsCount = allTrips.length;
-  const totalDuration = allTrips.reduce((acc, t) => acc + parseFloat(t.duration), 0);
-  const totalDistance = allTrips.reduce((acc, t) => acc + t.distance, 0);
-  const avgDistance = totalTripsCount > 0 ? (totalDistance / totalTripsCount).toFixed(1) : 0;
+  // Calculate dynamic KPIs based on Checkin Logs (real data)
+  let actualTrips = 0;
+  let actualDistance = 0;
+  let actualDurationHours = 0;
+  
+  // Sort logs ascending to pair checkout and checkin
+  const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const vehicleLastCheckout = {};
+  
+  sortedLogs.forEach(l => {
+    const vId = l.vehicle?.id;
+    if (l.type === 'CHECKOUT') {
+      vehicleLastCheckout[vId] = new Date(l.timestamp);
+    } else if (l.type === 'CHECKIN') {
+      actualTrips++;
+      
+      // Calculate duration
+      if (vehicleLastCheckout[vId]) {
+        const diffMs = new Date(l.timestamp) - vehicleLastCheckout[vId];
+        actualDurationHours += (diffMs / (1000 * 60 * 60));
+        vehicleLastCheckout[vId] = null;
+      }
+      
+      // Calculate distance based on cost - penalty
+      let penalty = 0;
+      try {
+        const damages = JSON.parse(l.damages || "[]");
+        damages.forEach(d => {
+          if (d.severity === 'HEAVY') penalty += 5000000;
+          else if (d.severity === 'MEDIUM') penalty += 2000000;
+          else if (d.severity === 'LIGHT') penalty += 500000;
+        });
+      } catch(e) {}
+      
+      const distanceCost = Math.max(0, (l.cost || 0) - penalty);
+      actualDistance += (distanceCost / 2500);
+    }
+  });
+
+  const avgDistance = actualTrips > 0 ? (actualDistance / actualTrips).toFixed(1) : 0;
   
   const ownership = currentUser?.ownershipPercentage || 33;
   const maxHoursAllowed = (ownership / 100.0) * 168.0; // Per week
-  const actualUsagePercentage = maxHoursAllowed > 0 ? ((totalDuration / (maxHoursAllowed * 4)) * 100).toFixed(0) : 0; // Approx month usage vs allowance
+  const actualUsagePercentage = maxHoursAllowed > 0 ? ((actualDurationHours / (maxHoursAllowed * 4)) * 100).toFixed(0) : 0; // Approx month usage vs allowance
 
-  // Filtering trips based on search query
-  const filteredTrips = allTrips.filter(t => 
-    t.purpose.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filtering logs based on search query
+  const filteredLogs = logs.filter(t => 
+    t.vehicle?.licensePlate?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    t.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -51,10 +102,10 @@ const HistoryPage = ({ currentUser, bookings }) => {
           <div className="w-10 h-10 rounded-xl bg-[#ecfdf5] flex items-center justify-center text-[#22c55e] mb-3">
             <i className="ph ph-route text-xl"></i>
           </div>
-          <p className="text-2xl font-bold text-ink">{totalDistance} km</p>
+          <p className="text-2xl font-bold text-ink">{actualDistance.toFixed(1)} km</p>
           <p className="text-xs text-slate-500 font-medium mt-0.5">Tổng quãng đường</p>
           <div className="flex items-center gap-1 mt-1 text-[11px] text-[#16a34a] font-semibold">
-            <i className="ph ph-arrow-up-right"></i>Ước tính
+            <i className="ph ph-check-circle"></i>Dữ liệu thực tế
           </div>
         </div>
 
@@ -63,10 +114,10 @@ const HistoryPage = ({ currentUser, bookings }) => {
           <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 mb-3">
             <i className="ph ph-clock text-xl"></i>
           </div>
-          <p className="text-2xl font-bold text-ink">{totalDuration.toFixed(1)} h</p>
+          <p className="text-2xl font-bold text-ink">{actualDurationHours.toFixed(1)} h</p>
           <p className="text-xs text-slate-500 font-medium mt-0.5">Tổng thời gian sử dụng</p>
           <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-400 font-semibold">
-            Tháng {new Date().getMonth() + 1}/{new Date().getFullYear()}
+            Thực tế giao nhận
           </div>
         </div>
 
@@ -75,7 +126,7 @@ const HistoryPage = ({ currentUser, bookings }) => {
           <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
             <i className="ph ph-calendar-check text-xl"></i>
           </div>
-          <p className="text-2xl font-bold text-ink">{totalTripsCount} chuyến</p>
+          <p className="text-2xl font-bold text-ink">{actualTrips} chuyến</p>
           <p className="text-xs text-slate-500 font-medium mt-0.5">Số lần sử dụng</p>
           <div className="flex items-center gap-1 mt-1 text-[11px] text-slate-400 font-semibold">TB {avgDistance} km/chuyến</div>
         </div>
@@ -96,14 +147,14 @@ const HistoryPage = ({ currentUser, bookings }) => {
       {/* Trip Log Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-semibold text-ink">Chi tiết chuyến đi</h3>
+          <h3 className="text-base font-semibold text-ink">Lịch sử Giao/Nhận xe thực tế</h3>
           <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-500 bg-slate-50">
             <i className="ph ph-magnifying-glass text-sm"></i>
             <input 
               type="text" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm chuyến đi..." 
+              placeholder="Tìm biển số..." 
               className="bg-transparent outline-none text-sm w-32 placeholder-slate-400 text-ink"
             />
           </div>
@@ -113,43 +164,52 @@ const HistoryPage = ({ currentUser, bookings }) => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-slate-400">
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Ngày</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Khung giờ</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Mục đích</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Quãng đường</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Thời gian</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Chi phí</th>
-                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Xe</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Loại</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Pin / ODO</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Tình trạng ghi nhận</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Chi phí phát sinh</th>
               </tr>
             </thead>
             
             <tbody className="divide-y divide-slate-50 text-ink">
-              {filteredTrips.map((t) => (
+              {filteredLogs.map((t) => {
+                let damageList = [];
+                try {
+                  damageList = t.damages ? JSON.parse(t.damages) : [];
+                } catch(e) {}
+                
+                return (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{t.date}</td>
-                  <td className="py-3 px-3 whitespace-nowrap">{t.time}</td>
+                  <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
+                  <td className="py-3 px-3 whitespace-nowrap font-bold text-ink">{t.vehicle?.licensePlate}</td>
                   <td className="py-3 px-3">
-                    <span className="flex items-center gap-1.5">
-                      <i className={t.icon}></i>
-                      {t.purpose}
+                    <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-fit ${t.type === 'CHECKIN' ? 'bg-brand-50 text-brand-600' : 'bg-blue-50 text-blue-600'}`}>
+                      <i className={t.type === 'CHECKIN' ? 'ph ph-sign-in' : 'ph ph-sign-out'}></i>
+                      {t.type === 'CHECKIN' ? 'Nhận xe' : 'Giao xe'}
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-semibold">{t.distance} km</td>
-                  <td className="py-3 px-3 text-slate-500">{t.duration} giờ</td>
-                  <td className="py-3 px-3 font-medium text-red-500">{formatCurrency(t.cost)}</td>
-                  <td className="py-3 px-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      t.status === 'COMPLETED' ? 'text-[#16a34a] bg-[#ecfdf5]' : 'text-amber-600 bg-amber-50'
-                    }`}>
-                      {t.status === 'COMPLETED' ? 'Hoàn thành' : 'Đang chờ'}
-                    </span>
+                  <td className="py-3 px-3 font-semibold text-xs">
+                    <span className="text-brand-600">{t.batteryPercentage}% Pin</span> <br/>
+                    <span className="text-blue-600">{t.odometer} km</span>
+                  </td>
+                  <td className="py-3 px-3 text-xs">
+                    {damageList.length > 0 ? (
+                      <span className="text-amber-600 font-bold bg-amber-50 px-2 py-1 rounded-lg">Có {damageList.length} lỗi</span>
+                    ) : (
+                      <span className="text-green-600">Bình thường</span>
+                    )}
+                  </td>
+                  <td className="py-3 px-3 font-medium text-red-500">
+                    {t.cost > 0 ? formatCurrency(t.cost) : '-'}
                   </td>
                 </tr>
-              ))}
+              )})}
 
-              {filteredTrips.length === 0 && (
+              {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="py-8 text-center text-slate-400">Không tìm thấy chuyến đi nào</td>
+                  <td colSpan="6" className="py-8 text-center text-slate-400">Chưa có lịch sử giao nhận xe nào</td>
                 </tr>
               )}
             </tbody>
@@ -158,7 +218,7 @@ const HistoryPage = ({ currentUser, bookings }) => {
 
         {/* Pagination */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-          <span>Hiển thị {filteredTrips.length} / {allTrips.length} chuyến</span>
+          <span>Hiển thị {filteredLogs.length} / {logs.length} giao dịch</span>
           <div className="flex items-center gap-2">
             <button className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-xs cursor-pointer font-medium">
               ← Trước

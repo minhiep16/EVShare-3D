@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { createBooking, createDispute } from '../services/api';
 
 const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -7,6 +8,9 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
   const [endTime, setEndTime] = useState("12:00");
   const [purpose, setPurpose] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
@@ -62,7 +66,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!purpose) {
-      alert("Vui l?ng đi?n m?c đích s? d?ng");
+      alert("Vui lòng điền mục đích sử dụng");
       return;
     }
 
@@ -80,12 +84,33 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
       });
 
       setPurpose("");
-      alert("Đăng k? l?ch đ?t xe thành công!");
+      alert("Đăng ký lịch đặt xe thành công!");
     } catch (err) {
       console.error(err);
-      alert(err.response?.data || "Đ? x?y ra l?i khi đăng k? l?ch.");
+      alert(err.response?.data || "Đã xảy ra lỗi khi đăng ký lịch.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateDispute = async (e) => {
+    e.preventDefault();
+    if (!disputeDesc.trim()) return;
+    setSubmittingDispute(true);
+    try {
+      await createDispute({
+        vehicleId: currentUser?.vehicle?.id,
+        title: "Báo cáo: Trả xe quá giờ",
+        description: disputeDesc,
+        priority: "HIGH"
+      });
+      alert("Đã gửi khiếu nại thành công! Ban quản trị sẽ tiếp nhận và xử lý.");
+      setShowDisputeModal(false);
+      setDisputeDesc('');
+    } catch (err) {
+      alert("Lỗi gửi khiếu nại: " + (err.response?.data || err.message));
+    } finally {
+      setSubmittingDispute(false);
     }
   };
 
@@ -130,7 +155,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
       if (isMine) {
         slotStatus = "mine";
         slotColor = "border-[#22c55e] border-2";
-        slotOwner = "C?a b?n";
+        slotOwner = "Của bạn";
       } else {
         slotStatus = "busy";
         slotColor = "border-blue-400 border-2";
@@ -221,8 +246,8 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h3 className="text-base font-semibold">Khung gi? – Th? {selectedDayOfWeek}, {String(selectedDate.getDate()).padStart(2, "0")}/{String(selectedDate.getMonth() + 1).padStart(2, "0")}/{selectedDate.getFullYear()}</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Ch?n khung gi? đ? đ?t l?ch</p>
+              <h3 className="text-base font-semibold">Khung giờ – Thứ {selectedDayOfWeek}, {String(selectedDate.getDate()).padStart(2, "0")}/{String(selectedDate.getMonth() + 1).padStart(2, "0")}/{selectedDate.getFullYear()}</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Chọn khung giờ để đặt lịch</p>
             </div>
           </div>
 
@@ -241,7 +266,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
                   className={`time-slot rounded-lg p-2 text-center transition-colors ${slot.colorClass} ${slot.status === "free" ? "cursor-pointer hover:border-[#22c55e] hover:bg-[#ecfdf5] border" : ""} ${startTime === slot.hour ? "border-[#22c55e] bg-[#ecfdf5] border" : ""}`}
                 >
                   <p className={`text-xs font-semibold ${slot.status === "free" ? "text-ink" : (slot.status === "mine" ? "text-[#16a34a]" : "text-blue-600")}`}>{slot.hour}</p>
-                  <p className={`text-[10px] mt-0.5 ${slot.status === "free" ? "text-slate-400" : (slot.status === "mine" ? "text-[#16a34a]" : "text-blue-500")}`}>{slot.owner || "Tr?ng"}</p>
+                  <p className={`text-[10px] mt-0.5 ${slot.status === "free" ? "text-slate-400" : (slot.status === "mine" ? "text-[#16a34a]" : "text-blue-500")}`}>{slot.owner || "Trống"}</p>
                 </div>
               )
             })}
@@ -256,10 +281,10 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
         <div className="bg-gradient-to-br from-[#0f172a] to-slate-800 rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-3">
             <i className="ph-fill ph-sparkle text-violet-400 text-lg"></i>
-            <p className="text-sm font-semibold">AI Phân tích công b?ng</p>
+            <p className="text-sm font-semibold">AI Phân tích công bằng</p>
           </div>
           <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-            D?a trên t? l? s? h?u {currentUser?.ownershipPercentage || 40}%, b?n có th? đ?t thêm <span className="text-white font-semibold">~18 gi?</span> trong tháng này.
+            Dựa trên tỷ lệ sở hữu {currentUser?.ownershipPercentage || 40}%, bạn có thể đặt thêm <span className="text-white font-semibold">~18 giờ</span> trong tháng này.
           </p>
           <div className="space-y-2">
             {coOwners.map((c, idx) => {
@@ -271,7 +296,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
                 <div key={c.id}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-slate-400">{c.name}</span>
-                    <span className={`${color.text} font-semibold`}>{c.ownershipPercentage}% · {usedH.toFixed(1)}h đ? dùng</span>
+                    <span className={`${color.text} font-semibold`}>{c.ownershipPercentage}% · {usedH.toFixed(1)}h đã dùng</span>
                   </div>
                   <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
                     <div className={`h-full ${color.bg} rounded-full`} style={{ width: `${pct}%` }}></div>
@@ -284,10 +309,10 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
 
         {/* Quick booking form */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <h3 className="text-base font-semibold mb-4">Đ?t l?ch nhanh</h3>
+          <h3 className="text-base font-semibold mb-4">Đặt lịch nhanh</h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Ngày s? d?ng</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Ngày sử dụng</label>
               <input 
                 type="date" 
                 value={selectedDateStr}
@@ -302,7 +327,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
             
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Gi? b?t đ?u</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Giờ bắt đầu</label>
                 <select 
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
@@ -314,7 +339,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Gi? k?t thúc</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Giờ kết thúc</label>
                 <select 
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
@@ -328,7 +353,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
             </div>
             
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">M?c đích s? d?ng</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Mục đích sử dụng</label>
               <input 
                 type="text" 
                 value={purpose}
@@ -342,8 +367,8 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
             <div className="bg-[#ecfdf5] border border-[#22c55e]/30 rounded-xl p-3 flex items-center gap-3">
               <i className="ph ph-check-circle text-[#22c55e] text-xl shrink-0"></i>
               <div>
-                <p className="text-xs font-semibold text-[#16a34a]">Khung gi? này tr?ng</p>
-                <p className="text-[11px] text-[#16a34a]/70 mt-0.5">Không có xung đ?t l?ch tr?nh</p>
+                <p className="text-xs font-semibold text-[#16a34a]">Khung giờ này trống</p>
+                <p className="text-[11px] text-[#16a34a]/70 mt-0.5">Không có xung đột lịch trình</p>
               </div>
             </div>
             
@@ -352,19 +377,27 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
               disabled={loading}
               className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white py-2.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
             >
-              {loading ? "Đang x? l?..." : "Xác nh?n đ?t l?ch"}
+              {loading ? "Đang xử lý..." : "Xác nhận đặt lịch"}
             </button>
           </form>
         </div>
 
         {/* Upcoming bookings */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold">L?ch s?p t?i</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-base font-semibold">Lịch sắp tới</h3>
             <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-md font-medium">
-              {bookings.length} chuy?n
+              {bookings.length} chuyến
             </span>
           </div>
+          
+          <button 
+            onClick={() => setShowDisputeModal(true)}
+            className="w-full mb-4 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <i className="ph ph-warning-circle text-base"></i>
+            Khiếu nại (Xe chưa được trả)
+          </button>
           
           <div className="space-y-3">
             {bookings.sort((a,b) => new Date(b.startTime) - new Date(a.startTime)).slice(0,5).map((b) => {
@@ -384,17 +417,17 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
                 cardClass += "bg-slate-50 border-slate-200";
                 dotClass = "bg-slate-500";
                 dateBgClass = "bg-slate-500";
-                statusLabel = "B?o dư?ng";
+                statusLabel = "Bảo dưỡng";
               } else if (isConfirmed) {
                 cardClass += "bg-[#ecfdf5] border-[#22c55e]/30";
                 dotClass = "bg-[#22c55e]";
                 dateBgClass = "bg-[#22c55e]";
-                statusLabel = "Đ? xác nh?n";
+                statusLabel = "Đã xác nhận";
               } else {
                 cardClass += "bg-amber-50 border-amber-200";
                 dotClass = "bg-amber-400";
                 dateBgClass = "bg-amber-400";
-                statusLabel = "Ch? duy?t";
+                statusLabel = "Chờ duyệt";
               }
 
               return (
@@ -423,15 +456,59 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
             })}
 
             {bookings.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-4">Chưa có l?ch đ?t nào</p>
+              <p className="text-xs text-slate-400 text-center py-4">Chưa có lịch đặt nào</p>
             )}
           </div>
         </div>
 
       </div>
+
+      {/* Dispute Modal */}
+      {showDisputeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in-up">
+            <div className="bg-red-500 p-4 text-white flex justify-between items-center">
+              <h3 className="font-bold flex items-center gap-2"><i className="ph-fill ph-warning-circle text-xl"></i> Báo cáo Tranh chấp</h3>
+              <button onClick={() => setShowDisputeModal(false)} className="hover:bg-red-600 p-1 rounded-lg transition-colors">
+                <i className="ph ph-x"></i>
+              </button>
+            </div>
+            <form onSubmit={handleCreateDispute} className="p-5">
+              <p className="text-sm text-slate-600 mb-4">Sử dụng tính năng này nếu người đi trước đã quá giờ mà vẫn chưa trả xe (chưa Check-in) làm ảnh hưởng tới lịch đặt của bạn.</p>
+              
+              <label className="block text-xs font-bold text-slate-700 mb-2">Chi tiết sự việc</label>
+              <textarea 
+                className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all mb-5 h-24 resize-none"
+                placeholder="Ví dụ: Đã lố 30 phút, gọi điện không bắt máy..."
+                value={disputeDesc}
+                onChange={(e) => setDisputeDesc(e.target.value)}
+                required
+              />
+              
+              <div className="flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setShowDisputeModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-50 transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={submittingDispute}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors flex justify-center items-center gap-2 disabled:bg-red-300"
+                >
+                  {submittingDispute ? <i className="ph ph-spinner animate-spin"></i> : <i className="ph ph-paper-plane-tilt"></i>}
+                  Gửi báo cáo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 export default BookingPage;
-

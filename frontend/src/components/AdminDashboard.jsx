@@ -55,7 +55,8 @@ const AdminDashboard = () => {
       fetchData(); // Refresh list
     } catch (err) {
       console.error(err);
-      alert('Có lỗi xảy ra khi gán thành viên');
+      const errorMessage = err.response?.data || 'Có lỗi xảy ra khi gán thành viên';
+      alert('❌ ' + errorMessage);
     }
   };
 

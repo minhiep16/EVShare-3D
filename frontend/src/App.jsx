@@ -18,6 +18,8 @@ import AdminFinance from './components/AdminFinance';
 import AdminServices from './components/AdminServices';
 import LoginPage from './components/LoginPage';
 import VehicleCheckin3D from './components/VehicleCheckin3D';
+import AdminVehicles from './components/AdminVehicles';
+import AdminContracts from './components/AdminContracts';
 import { getDashboardData, createBooking, castVote, createVehicle } from './services/api';
 
 function App() {
@@ -397,7 +399,15 @@ function App() {
               <AdminServices />
             )}
 
-            {['admin_vehicles', 'admin_contracts', 'admin_checkin', 'admin_staff'].includes(activeTab) && (
+            {activeTab === 'admin_vehicles' && (
+              <AdminVehicles />
+            )}
+
+            {activeTab === 'admin_contracts' && (
+              <AdminContracts />
+            )}
+
+            {['admin_staff'].includes(activeTab) && (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
                 <div className="w-16 h-16 bg-violet-50 text-violet-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
                   <i className="ph ph-squares-four text-violet-600"></i>
@@ -436,67 +446,96 @@ function App() {
       {/* Create Vehicle Modal */}
       {isCreateVehicleModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fade-in-up">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
-                <i className="ph ph-car-profile text-brand-500"></i>Tạo nhóm xe mới
-              </h3>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up border border-slate-100">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-brand-600 to-brand-500 p-6 flex items-start justify-between relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+              
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-white mb-1">Thêm Nhóm Xe Mới</h3>
+                <p className="text-brand-100 text-xs">Khởi tạo và cấu hình phương tiện vào hệ thống</p>
+              </div>
               <button 
                 onClick={() => setIsCreateVehicleModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
+                className="relative z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
               >
                 <i className="ph ph-x"></i>
               </button>
             </div>
             
-            <form onSubmit={handleCreateVehicleSubmit} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dòng xe (Model) <span className="text-red-500">*</span></label>
-                <input 
-                  type="text"
-                  required
-                  placeholder="VD: VinFast VF8"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  value={newVehicle.model}
-                  onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Biển số xe <span className="text-red-500">*</span></label>
-                <input 
-                  type="text"
-                  required
-                  placeholder="VD: 51H-123.45"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  value={newVehicle.licensePlate}
-                  onChange={e => setNewVehicle({...newVehicle, licensePlate: e.target.value})}
-                />
-              </div>
+            <form onSubmit={handleCreateVehicleSubmit} className="p-6 space-y-5">
+              {/* Form Body */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Dòng xe (Model) <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <i className="ph ph-car text-slate-400 text-lg"></i>
+                    </div>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="VD: VinFast VF8"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-medium text-ink placeholder:font-normal"
+                      value={newVehicle.model}
+                      onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Biển số xe <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <i className="ph ph-tag text-slate-400 text-lg"></i>
+                    </div>
+                    <input 
+                      type="text"
+                      required
+                      placeholder="VD: 51H-123.45"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-mono font-bold text-ink placeholder:font-normal placeholder:font-sans"
+                      value={newVehicle.licensePlate}
+                      onChange={e => setNewVehicle({...newVehicle, licensePlate: e.target.value})}
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Hình ảnh (URL)</label>
-                <input 
-                  type="url"
-                  placeholder="Để trống sẽ dùng ảnh mặc định"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                  value={newVehicle.imageUrl}
-                  onChange={e => setNewVehicle({...newVehicle, imageUrl: e.target.value})}
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Hình ảnh xe (URL)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <i className="ph ph-image text-slate-400 text-lg"></i>
+                    </div>
+                    <input 
+                      type="url"
+                      placeholder="https://..."
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-medium text-ink placeholder:font-normal"
+                      value={newVehicle.imageUrl}
+                      onChange={e => setNewVehicle({...newVehicle, imageUrl: e.target.value})}
+                    />
+                  </div>
+                  {newVehicle.imageUrl && (
+                    <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 h-28 relative bg-slate-100">
+                      <img src={newVehicle.imageUrl} className="w-full h-full object-cover" alt="Preview" onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=800&q=80"; }}/>
+                      <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-md">Preview</div>
+                    </div>
+                  )}
+                </div>
               </div>
               
-              <div className="pt-2">
+              <div className="pt-4 border-t border-slate-100">
                 <button 
                   type="submit"
                   disabled={creatingVehicle}
-                  className={`w-full py-2.5 rounded-lg text-sm font-bold text-white transition-colors cursor-pointer flex items-center justify-center gap-2 ${
-                    creatingVehicle ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                  className={`w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all shadow-lg shadow-brand-500/20 cursor-pointer flex items-center justify-center gap-2 ${
+                    creatingVehicle ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 hover:-translate-y-0.5'
                   }`}
                 >
                   {creatingVehicle ? (
-                    <><i className="ph ph-spinner animate-spin text-lg"></i>Đang khởi tạo...</>
+                    <><i className="ph ph-spinner animate-spin text-xl"></i> Đang khởi tạo...</>
                   ) : (
-                    <><i className="ph ph-plus-circle text-lg"></i>Tạo Nhóm Xe</>
+                    <><i className="ph ph-rocket-launch text-xl"></i> Khởi tạo Nhóm Xe</>
                   )}
                 </button>
               </div>

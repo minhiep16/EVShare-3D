@@ -5,24 +5,45 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
   const [selectedMethod, setSelectedMethod] = useState('wallet');
   const [filterType, setFilterType] = useState('Tất cả');
 
-  // Find the pending transaction
-  const pendingTx = transactions.find(t => t.status === 'PENDING' || t.title?.includes('Đăng kiểm'));
-  const unpaidAmount = pendingTx ? pendingTx.amount * (currentUser?.ownershipPercentage || 0) / 100 : 0;
+  // Find the personal pending transaction (TRIP_FEE)
+  const personalPendingTx = transactions.find(t => t.status === 'PENDING' && t.type === 'TRIP_FEE' && String(t.userId) === String(currentUser?.id));
+  // Find group pending transactions
+  const groupPendingTx = transactions.find(t => t.status === 'PENDING' && t.type !== 'TRIP_FEE');
+  
+  const pendingTx = personalPendingTx || groupPendingTx;
+  
+  const unpaidAmount = (personalPendingTx ? personalPendingTx.amount : 0) + 
+                       (groupPendingTx ? groupPendingTx.amount * (currentUser?.ownershipPercentage || 0) / 100 : 0);
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!pendingTx) {
       alert('Không có khoản thanh toán nào đang chờ!');
       return;
     }
     
-    const updated = transactions.map(t => {
-      if (t.id === pendingTx.id) {
-        return { ...t, status: 'PAID' };
+    try {
+      // Call actual backend API
+      const token = localStorage.getItem('evshare_jwt_token');
+      const response = await fetch(`http://localhost:8080/api/transactions/${pendingTx.id}/pay`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Thanh toán thất bại từ máy chủ!');
       }
-      return t;
-    });
-    setTransactions(updated);
-    alert('🎉 Thanh toán thành công! Trạng thái giao dịch đã được cập nhật.');
+      
+      const updated = transactions.map(t => {
+        if (t.id === pendingTx.id) {
+          return { ...t, status: 'PAID' };
+        }
+        return t;
+      });
+      setTransactions(updated);
+      alert('🎉 Thanh toán thành công! Trạng thái giao dịch đã được cập nhật.');
+    } catch (err) {
+      alert("Lỗi khi thanh toán: " + err.message);
+    }
   };
 
   const formatCurrency = (value) => {
@@ -44,10 +65,12 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
     return catName === filterType || (catName && catName.includes(filterType));
   });
 
-  // Calculate totals dynamically
+  // Calculate totals dynamically (group costs only)
+  const groupTransactions = transactions.filter(t => t.type !== 'TRIP_FEE');
+  
   const totalCost = useMemo(() => {
-    return transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  }, [transactions]);
+    return groupTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  }, [groupTransactions]);
 
   const userShare = totalCost * (currentUser?.ownershipPercentage || 0) / 100;
   const jointFund = currentUser?.vehicle?.jointFundBalance || 0;
@@ -61,7 +84,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
       'Khác': 0
     };
 
-    transactions.forEach(t => {
+    groupTransactions.forEach(t => {
       const cat = t.categoryName || t.title || '';
       if (cat.includes('Sạc')) categories['Sạc điện'] += t.amount;
       else if (cat.includes('Bảo dưỡng')) categories['Bảo dưỡng'] += t.amount;
@@ -75,7 +98,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
       { label: 'Bảo hiểm', value: categories['Bảo hiểm'], color: '#f59e0b' },
       { label: 'Khác', value: categories['Khác'], color: '#94a3b8' }
     ].filter(d => d.value > 0);
-  }, [transactions]);
+  }, [groupTransactions]);
 
   // If no data, use some default for donut visual
   const safeDonutData = donutData.length > 0 ? donutData : [
@@ -292,7 +315,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                   <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Ngày</th>
                   <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Loại chi phí</th>
                   <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Tổng</th>
-                  <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Phần bạn</th>
+                  <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Người chịu phí</th>
                   <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
                 </tr>
               </thead>
@@ -300,7 +323,8 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                 {filteredTransactions.map((t) => {
                   const isPaid = t.status ? t.status === 'PAID' : true;
                   const isPending = t.status === 'PENDING';
-                  const userPart = (t.amount || 0) * (currentUser?.ownershipPercentage || 0) / 100;
+                  const isPersonal = t.type === 'TRIP_FEE';
+                  const userPart = isPersonal ? (t.amount || 0) : (t.amount || 0) * (currentUser?.ownershipPercentage || 0) / 100;
                   const catName = t.categoryName || t.title;
                   const tDate = t.date || t.transactionDate || t.createdAt;
                   
@@ -313,14 +337,31 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                         {tDate ? new Date(tDate).toLocaleDateString('vi-VN') : ''}
                       </td>
                       <td className="py-3 px-3">
-                        <span className="flex items-center gap-2">
-                          <i className={getIconClassForCategory(t.type)}></i>
-                          {catName}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="flex items-center gap-2 font-medium">
+                            <i className={getIconClassForCategory(t.type)}></i>
+                            {catName}
+                          </span>
+                          {t.description && (
+                            <span className="text-[10px] text-slate-400 mt-1 max-w-[200px] truncate" title={t.description}>
+                              {t.description}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-3 font-medium">{formatCurrency(t.amount)}</td>
-                      <td className={`py-3 px-3 font-semibold ${isPending ? 'text-amber-600' : 'text-[#16a34a]'}`}>
-                        {formatCurrency(userPart)}
+                      <td className={`py-3 px-3 font-semibold ${isPersonal ? 'text-amber-600' : 'text-slate-600'}`}>
+                        {isPersonal ? (
+                          <div className="flex flex-col">
+                            <span>{t.userName || currentUser?.name}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Cá nhân</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col">
+                            <span>Quỹ chung</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Tất cả thành viên</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
@@ -355,7 +396,12 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
               
               <div className="bg-amber-50 rounded-xl p-4 mb-4">
                 <p className="text-xs text-amber-600 font-medium mb-1">Phí {pendingTx.categoryName || pendingTx.title}</p>
-                <p className="text-2xl font-bold text-amber-700">{formatCurrency(unpaidAmount)}</p>
+                <p className="text-2xl font-bold text-amber-700 mb-2">{formatCurrency(unpaidAmount)}</p>
+                {pendingTx.description && (
+                  <p className="text-[11px] text-amber-600/80 bg-amber-100/50 p-2 rounded-lg border border-amber-200/50 italic leading-relaxed">
+                    Chi tiết: {pendingTx.description}
+                  </p>
+                )}
               </div>
 
               {/* Payment Methods */}

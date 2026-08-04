@@ -40,7 +40,13 @@ public class User {
     private Double walletBalance = 0.0;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Vehicle vehicle;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("vehicleId")
+    public Long getVehicleId() {
+        return vehicle != null ? vehicle.getId() : null;
+    }
 
     @Enumerated(EnumType.STRING)
     private UserStatus status = UserStatus.ACTIVE;

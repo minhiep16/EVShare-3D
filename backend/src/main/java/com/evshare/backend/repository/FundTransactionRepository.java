@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface FundTransactionRepository extends JpaRepository<FundTransaction, Long> {
-    List<FundTransaction> findByVehicleIdOrderByTransactionDateDesc(Long vehicleId);
+    List<FundTransaction> findByVehicle_IdOrderByTransactionDateDesc(Long vehicleId);
 }
