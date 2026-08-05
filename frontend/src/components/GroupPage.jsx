@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleTransactions } from '../services/api';
+import { getVehicleTransactions, getServiceTemplates, proposeServiceVote } from '../services/api';
 
 const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
   const [fundHistory, setFundHistory] = useState([]);
+  const [showProposeModal, setShowProposeModal] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [proposeReason, setProposeReason] = useState('');
   
   // Use actual joint fund balance from vehicle
   const fundBalance = currentUser?.vehicle?.jointFundBalance || 0;
@@ -25,16 +29,47 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
       }
     };
     fetchTransactions();
+
+    const fetchTemplates = async () => {
+      try {
+        const data = await getServiceTemplates();
+        setTemplates(data);
+        if (data && data.length > 0) {
+          setSelectedTemplateId(data[0].id.toString());
+        }
+      } catch (err) {
+        console.error("Failed to fetch templates", err);
+      }
+    };
+    fetchTemplates();
   }, [currentUser]);
 
+  const handleProposeService = async () => {
+    if (!selectedTemplateId) return;
+    try {
+      await proposeServiceVote(currentUser.vehicle.id, {
+        templateId: selectedTemplateId,
+        reason: proposeReason || 'Đến hạn'
+      });
+      alert('✅ Đã đệ trình biểu quyết thành công!');
+      setShowProposeModal(false);
+      setProposeReason('');
+      // Ideally refresh votes here
+      if (onVoteCast) onVoteCast(null); // trigger refresh
+    } catch (e) {
+      console.error(e);
+      alert('❌ Có lỗi xảy ra khi tạo biểu quyết: ' + (e.response?.data?.message || e.response?.data || e.message));
+    }
+  };
+
   const handleVote = async (voteId, agree) => {
-    if (onVoteCast && agree) {
-      // For now, API only supports casting "Agree" (adding ownership percentage)
-      // Disagree is practically ignoring the vote until it expires.
-      await onVoteCast(voteId);
-      alert('🗳️ Đã ghi nhận phiếu đồng ý của bạn!');
-    } else {
-      alert('❌ Đã ghi nhận phiếu từ chối!');
+    if (onVoteCast) {
+      await onVoteCast(voteId, agree);
+      if (agree) {
+        alert('🗳️ Đã ghi nhận phiếu đồng ý của bạn!');
+      } else {
+        alert('❌ Đã ghi nhận phiếu từ chối!');
+      }
     }
   };
 
@@ -212,9 +247,65 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
       {/* Right Column: Voting + AI */}
       <div className="space-y-5">
         
+        {/* Propose Action */}
+        <button 
+          onClick={() => setShowProposeModal(true)}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-2xl shadow-sm transition-colors flex items-center justify-center gap-2"
+        >
+          <i className="ph ph-plus-circle text-lg"></i>
+          Đề xuất Dịch vụ Xe
+        </button>
+
+        {showProposeModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 className="font-bold text-ink text-lg">Đề xuất Dịch vụ mới</h3>
+                <button onClick={() => setShowProposeModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <i className="ph ph-x text-lg"></i>
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chọn dịch vụ sẵn có</label>
+                  <select 
+                    value={selectedTemplateId} 
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                    className="w-full border-slate-200 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border"
+                  >
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name} - {formatCurrency(t.estimatedCost)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Lý do đề xuất</label>
+                  <textarea 
+                    value={proposeReason}
+                    onChange={e => setProposeReason(e.target.value)}
+                    placeholder="VD: Gần đến lễ cần dọn xe..."
+                    className="w-full border-slate-200 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border min-h-[80px]"
+                  ></textarea>
+                </div>
+                <button 
+                  onClick={handleProposeService}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg shadow-sm transition-colors"
+                >
+                  Tạo biểu quyết
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Active Vote Card */}
         {openVotes.map((vote) => {
-          const votePercentage = vote.agreedPercentage || 0;
+          const agreedCount = vote.agreedPercentage || 0;
+          const totalMembers = vote.totalPercentage || 100;
+          const requiredVotes = totalMembers <= 3 ? totalMembers : (totalMembers === 4 ? 3 : (totalMembers === 5 ? 4 : Math.ceil(totalMembers * 0.8)));
+          const fillPercentage = Math.min((agreedCount / requiredVotes) * 100, 100);
           
           return (
             <div 
@@ -239,7 +330,6 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
               {/* Vote status lists */}
               <div className="space-y-2 mb-4">
                 {coOwners.map((m) => {
-                  const hasVoted = false; // Need explicit tracking backend if we want to show who voted, for now omit or show general
                   return (
                     <div key={m.id} className="flex items-center gap-3">
                       <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover shrink-0" />
@@ -252,12 +342,12 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast }) => {
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
                 <div 
                   className="h-full bg-[#22c55e] rounded-full transition-all duration-300" 
-                  style={{ width: `${votePercentage}%` }}
+                  style={{ width: `${fillPercentage}%` }}
                 ></div>
               </div>
               
               <p className="text-xs text-slate-400 mb-4 font-medium">
-                {votePercentage}% đồng ý · Cần trên 50% để thông qua
+                {agreedCount}/{totalMembers} đồng ý · Cần {requiredVotes} phiếu để thông qua
               </p>
               
               <div className="grid grid-cols-2 gap-2">

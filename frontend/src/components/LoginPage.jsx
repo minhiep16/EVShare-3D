@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { login as apiLogin, register as apiRegister } from '../services/api';
+import { login as apiLogin, register as apiRegister, uploadFile } from '../services/api';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const [activeForm, setActiveForm] = useState('login'); // login, register
@@ -13,9 +13,13 @@ const LoginPage = ({ onLoginSuccess }) => {
     phone: '',
     cccd: '',
     gplx: '',
+    cccdImageUrl: '',
+    gplxImageUrl: '',
     password: '',
     role: 'USER'
   });
+  
+  const [isUploading, setIsUploading] = useState(false);
   
   const [rememberMe, setRememberMe] = useState(true);
   const [loginError, setLoginError] = useState('');
@@ -77,6 +81,8 @@ const LoginPage = ({ onLoginSuccess }) => {
       email: `${registerForm.phone}@evshare.vn`,
       cccd: registerForm.cccd,
       gplx: registerForm.gplx,
+      cccdImageUrl: registerForm.cccdImageUrl,
+      gplxImageUrl: registerForm.gplxImageUrl,
       password: registerForm.password,
       role: registerForm.role
     };
@@ -422,16 +428,42 @@ const LoginPage = ({ onLoginSuccess }) => {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">Tải lên ảnh CCCD / Giấy phép lái xe</label>
-                  <div 
-                    onClick={() => alert('📁 Hãy chọn tệp ảnh CCCD/GPLX mặt trước và mặt sau để tiến hành eSign OCR...')}
-                    className="border-2 border-dashed border-[#22c55e]/40 rounded-2xl bg-[#f0fdf4]/40 p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-colors"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-[#22c55e] mb-1.5">
-                      <i className="ph ph-upload-simple text-base"></i>
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-700">Kéo thả hoặc <span className="text-brand-500">chọn tập tin</span></p>
-                    <p className="text-[9px] text-slate-400 mt-0.5">PNG, JPG tối đa 5MB · Mặt trước & sau</p>
-                  </div>
+                  <label className="border-2 border-dashed border-[#22c55e]/40 rounded-2xl bg-[#f0fdf4]/40 p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-colors">
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          try {
+                            setIsUploading(true);
+                            const res = await uploadFile(e.target.files[0]);
+                            setRegisterForm({ ...registerForm, cccdImageUrl: res.url, gplxImageUrl: res.url });
+                          } catch (err) {
+                            console.error(err);
+                            alert('Lỗi tải ảnh lên: ' + (err.response?.data || err.message));
+                          } finally {
+                            setIsUploading(false);
+                          }
+                        }
+                      }}
+                    />
+                    
+                    {isUploading ? (
+                      <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-[#22c55e] mb-1.5 animate-spin border-2 border-[#22c55e] border-t-transparent"></div>
+                    ) : registerForm.cccdImageUrl ? (
+                      <img src={registerForm.cccdImageUrl} alt="CCCD Preview" className="h-12 object-contain rounded mb-1.5 shadow" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-[#22c55e] mb-1.5">
+                        <i className="ph ph-upload-simple text-base"></i>
+                      </div>
+                    )}
+                    
+                    <p className="text-[11px] font-bold text-slate-700">
+                      {isUploading ? 'Đang tải lên...' : registerForm.cccdImageUrl ? 'Đã tải lên thành công' : 'Kéo thả hoặc chọn tập tin'}
+                    </p>
+                    <p className="text-[9px] text-slate-400 mt-0.5">PNG, JPG tối đa 5MB</p>
+                  </label>
                 </div>
 
                 <button 

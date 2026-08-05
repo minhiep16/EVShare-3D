@@ -22,10 +22,46 @@ public class DataInitializer implements CommandLineRunner {
     private final SuggestionRepository suggestionRepository;
     private final FundTransactionRepository fundTransactionRepository;
     private final ServiceRecordRepository serviceRecordRepository;
+    private final ServiceTemplateRepository serviceTemplateRepository;
     private final DisputeRepository disputeRepository;
 
     @Override
     public void run(String... args) throws Exception {
+        if (serviceTemplateRepository.count() == 0) {
+            System.out.println("Seeding Service Templates...");
+            ServiceTemplate st1 = ServiceTemplate.builder()
+                    .name("Bảo dưỡng định kỳ 10,000km")
+                    .description("Thay dầu phanh, nước làm mát, kiểm tra lốp và phanh")
+                    .estimatedCost(3000000.0)
+                    .isActive(true)
+                    .build();
+            serviceTemplateRepository.save(st1);
+
+            ServiceTemplate st2 = ServiceTemplate.builder()
+                    .name("Rửa xe bọt tuyết & Vệ sinh nội thất")
+                    .description("Làm sạch toàn diện trong ngoài xe")
+                    .estimatedCost(300000.0)
+                    .isActive(true)
+                    .build();
+            serviceTemplateRepository.save(st2);
+
+            ServiceTemplate st3 = ServiceTemplate.builder()
+                    .name("Gia hạn Đăng kiểm")
+                    .description("Chi phí gia hạn phí đường bộ và tem kiểm định")
+                    .estimatedCost(2500000.0)
+                    .isActive(true)
+                    .build();
+            serviceTemplateRepository.save(st3);
+
+            ServiceTemplate st4 = ServiceTemplate.builder()
+                    .name("Phủ màng Ceramic bảo vệ sơn")
+                    .description("Phủ Ceramic 9H cao cấp giúp xe luôn bóng đẹp")
+                    .estimatedCost(5500000.0)
+                    .isActive(true)
+                    .build();
+            serviceTemplateRepository.save(st4);
+        }
+
         // Only initialize if DB is empty
         if (userRepository.count() == 0) {
             // 1. Vehicle
@@ -294,7 +330,9 @@ public class DataInitializer implements CommandLineRunner {
                 .transactionDate(LocalDateTime.now().minusDays(1))
                 .build());
 
-            // 8. ServiceRecord
+
+
+            // 9. ServiceRecord
             serviceRecordRepository.save(ServiceRecord.builder()
                 .vehicle(vehicle)
                 .serviceType("Bảo dưỡng")

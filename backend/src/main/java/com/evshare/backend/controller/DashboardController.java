@@ -6,6 +6,12 @@ import com.evshare.backend.entity.Vote;
 import com.evshare.backend.entity.User;
 import com.evshare.backend.entity.Transaction;
 import com.evshare.backend.entity.Vehicle;
+import com.evshare.backend.entity.Vote;
+import com.evshare.backend.repository.VoteRepository;
+import com.evshare.backend.entity.ServiceTemplate;
+import com.evshare.backend.repository.ServiceTemplateRepository;
+import com.evshare.backend.entity.ServiceRecord;
+import com.evshare.backend.repository.ServiceRecordRepository;
 import com.evshare.backend.repository.*;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +40,8 @@ public class DashboardController {
     private final VoteRepository voteRepository;
     private final SuggestionRepository suggestionRepository;
     private final FundTransactionRepository fundTransactionRepository;
+    private final ServiceTemplateRepository serviceTemplateRepository;
+    private final ServiceRecordRepository serviceRecordRepository;
     private final CheckinLogRepository checkinLogRepository;
 
     @GetMapping("/dashboard")
@@ -164,9 +172,30 @@ public class DashboardController {
         return ResponseEntity.ok(saved);
     }
 
+    @PostMapping("/vehicles/{id}/votes/propose-service")
+    public ResponseEntity<?> proposeService(@PathVariable Long id, @RequestBody ProposeServiceRequest request, HttpServletRequest httpRequest) {
+        Vehicle vehicle = vehicleRepository.findById(id).orElse(null);
+        if (vehicle == null) return ResponseEntity.badRequest().body("Vehicle not found");
+
+        ServiceTemplate template = serviceTemplateRepository.findById(request.getTemplateId()).orElse(null);
+        if (template == null) return ResponseEntity.badRequest().body("Service Template not found");
+
+        int totalMembers = userRepository.countByVehicle_Id(vehicle.getId());
+
+        Vote vote = Vote.builder()
+                .vehicle(vehicle)
+                .title("Đề xuất: " + template.getName())
+                .description("Chi phí dự kiến: " + template.getEstimatedCost() + " VNĐ. Lý do: " + request.getReason())
+                .agreedPercentage(0.0)
+                .totalPercentage((double) totalMembers)
+                .status("OPEN")
+                .build();
+        return ResponseEntity.ok(voteRepository.save(vote));
+    }
+
     @PostMapping("/votes/{id}/cast")
     @Transactional
-    public ResponseEntity<?> castVote(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<?> castVote(@PathVariable Long id, HttpServletRequest request, @RequestParam(defaultValue = "true") boolean agree) {
         Long userId = (Long) request.getAttribute("userId");
         User user = userRepository.findById(userId).orElse(null);
         if (user == null || user.getOwnershipPercentage() == null) {
@@ -175,14 +204,59 @@ public class DashboardController {
 
         Vote vote = voteRepository.findById(id).orElse(null);
         if (vote != null && "OPEN".equals(vote.getStatus())) {
-            vote.setAgreedPercentage(vote.getAgreedPercentage() + user.getOwnershipPercentage());
-            
-            if (vote.getAgreedPercentage() >= 50.0) {
-                vote.setDescription(vote.getTitle() + " – Đã thông qua (" + vote.getAgreedPercentage() + "% đồng ý)");
-                vote.setStatus("CLOSED");
-            } else {
-                vote.setDescription(vote.getTitle() + " – " + vote.getAgreedPercentage() + "% đồng ý");
+            if (vote.getVoterIds().contains(userId) || vote.getRejecterIds().contains(userId)) {
+                return ResponseEntity.badRequest().body("Bạn đã tham gia biểu quyết này rồi.");
             }
+
+            int totalMembers = userRepository.countByVehicle_Id(vote.getVehicle().getId());
+            vote.setTotalPercentage((double) totalMembers);
+
+            int requiredVotes;
+            if (totalMembers <= 3) {
+                requiredVotes = totalMembers;
+            } else if (totalMembers == 4) {
+                requiredVotes = 3;
+            } else if (totalMembers == 5) {
+                requiredVotes = 4;
+            } else {
+                requiredVotes = (int) Math.ceil(totalMembers * 0.8);
+            }
+
+            if (agree) {
+                vote.getVoterIds().add(userId);
+                vote.setAgreedPercentage(vote.getAgreedPercentage() + 1.0);
+            } else {
+                vote.getRejecterIds().add(userId);
+                vote.setRejectedPercentage(vote.getRejectedPercentage() + 1.0);
+            }
+
+            int maxAllowedRejects = totalMembers - requiredVotes;
+
+            if (vote.getAgreedPercentage() >= requiredVotes) {
+                vote.setDescription(vote.getTitle() + " – Đã thông qua (" + vote.getAgreedPercentage().intValue() + "/" + totalMembers + " đồng ý)");
+                vote.setStatus("CLOSED");
+
+                // Auto create Service Record if this is a service proposal
+                if (vote.getTitle().startsWith("Đề xuất: ")) {
+                    String serviceName = vote.getTitle().substring("Đề xuất: ".length());
+                    ServiceRecord record = ServiceRecord.builder()
+                            .vehicle(vote.getVehicle())
+                            .serviceType(serviceName)
+                            .description(vote.getDescription())
+                            .status("PENDING")
+                            .cost(0.0) // Admin will finalize cost later
+                            .scheduledDate(java.time.LocalDateTime.now().plusDays(3))
+                            .build();
+                    serviceRecordRepository.save(record);
+                }
+
+            } else if (vote.getRejectedPercentage() > maxAllowedRejects) {
+                vote.setDescription(vote.getTitle() + " – Bị hủy (" + vote.getRejectedPercentage().intValue() + " người từ chối)");
+                vote.setStatus("REJECTED");
+            } else {
+                vote.setDescription(vote.getTitle() + " – " + vote.getAgreedPercentage().intValue() + "/" + totalMembers + " đồng ý, " + vote.getRejectedPercentage().intValue() + " từ chối");
+            }
+            
             voteRepository.save(vote);
             return ResponseEntity.ok(vote);
         }
@@ -229,5 +303,11 @@ public class DashboardController {
         private LocalDateTime startTime;
         private LocalDateTime endTime;
         private String purpose;
+    }
+
+    @Data
+    public static class ProposeServiceRequest {
+        private Long templateId;
+        private String reason;
     }
 }

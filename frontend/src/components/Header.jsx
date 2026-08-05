@@ -114,7 +114,7 @@ const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
           </div>
           
           <button 
-            onClick={() => alert('📅 Mở giao diện tạo lịch bảo dưỡng/đăng kiểm xe mới...')}
+            onClick={() => document.dispatchEvent(new Event('openCreateServiceModal'))}
             className="inline-flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
           >
             <i className="ph ph-plus"></i>Tạo lịch dịch vụ

@@ -72,13 +72,13 @@ function App() {
     fetchDashboard();
   };
 
-  const handleVoteClick = async (voteId) => {
+  const handleVoteClick = async (voteId, agree) => {
     try {
-      await castVote(voteId);
+      await castVote(voteId, agree);
       fetchDashboard();
     } catch (err) {
       console.error(err);
-      alert('Không thể thực hiện bỏ phiếu.');
+      alert('Không thể thực hiện bỏ phiếu: ' + (err.response?.data?.message || err.response?.data || err.message));
     }
   };
 
@@ -180,7 +180,7 @@ function App() {
   // Find the exact profile from the backend data using activeUser.id
   const userProfile = activeUser ? data?.coOwners?.find(u => u.id === activeUser.id) : data?.coOwners?.[0];
 
-  const currentUser = activeUser || (currentRole === 'USER' ? {
+  const currentUserBase = activeUser || (currentRole === 'USER' ? {
     id: userProfile?.id || 1,
     name: userProfile?.name || 'Nguyễn Thị Mai',
     avatarUrl: userProfile?.avatarUrl || 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg',
@@ -191,6 +191,11 @@ function App() {
     avatarUrl: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg',
     role: 'Administrator'
   });
+  
+  const currentUser = {
+    ...currentUserBase,
+    vehicle: data?.vehicle
+  };
   const ownershipPercentage = userProfile?.ownershipPercentage || 40;
 
   const handleRoleChange = (newRole) => {

@@ -70,6 +70,8 @@ public class AuthController {
                         : request.getPhone() + "@evshare.vn")
                 .cccd(request.getCccd())
                 .gplx(request.getGplx())
+                .cccdImageUrl(request.getCccdImageUrl())
+                .gplxImageUrl(request.getGplxImageUrl())
                 .password(request.getPassword())
                 .role(request.getRole() != null ? request.getRole() : "USER")
                 .avatarUrl(request.getRole() != null && request.getRole().equals("ADMIN") 
@@ -96,6 +98,8 @@ public class AuthController {
         private String email;
         private String cccd;
         private String gplx;
+        private String cccdImageUrl;
+        private String gplxImageUrl;
         private String password;
         private String role;
     }

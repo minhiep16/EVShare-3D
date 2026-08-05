@@ -25,8 +25,19 @@ export const createBooking = async (bookingRequest) => {
   return response.data;
 };
 
-export const castVote = async (voteId) => {
-  const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast`);
+export const uploadFile = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axios.post(`${API_BASE_URL}/upload`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
+export const castVote = async (voteId, agree = true) => {
+  const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`);
   return response.data;
 };
 
@@ -81,6 +92,7 @@ export const getFinanceSummary = async () => {
   return response.data;
 };
 
+// --------- SERVICES API ---------
 export const getPendingServices = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/services/pending`);
   return response.data;
@@ -88,6 +100,26 @@ export const getPendingServices = async () => {
 
 export const getCompletedServices = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/services/completed`);
+  return response.data;
+};
+
+export const createServiceRecord = async (recordData) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/services`, recordData);
+  return response.data;
+};
+
+export const getServiceTemplates = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/services/templates`);
+  return response.data;
+};
+
+export const createServiceTemplate = async (templateData) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/services/templates`, templateData);
+  return response.data;
+};
+
+export const proposeServiceVote = async (vehicleId, data) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/votes/propose-service`, data);
   return response.data;
 };
 

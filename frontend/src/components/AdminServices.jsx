@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingServices, getCompletedServices } from '../services/api';
+import { getPendingServices, getCompletedServices, createServiceTemplate, getAllVehicles, createServiceRecord } from '../services/api';
 
 const AdminServices = () => {
   const [filterCategory, setFilterCategory] = useState('Tất cả');
@@ -8,19 +8,34 @@ const AdminServices = () => {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   
+  // Template Creation Modal
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [newTemplate, setNewTemplate] = useState({ name: '', description: '', estimatedCost: '' });
+  
+  // Service Record Modal
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [vehicles, setVehicles] = useState([]);
+  const [newRecord, setNewRecord] = useState({ vehicleId: '', serviceType: 'Bảo dưỡng', description: '', cost: '', scheduledDate: '' });
+  
   // Interactive states for card tasks
   const [service1Status, setService1Status] = useState('Sắp đến hạn');
   const [truckDispatched, setTruckDispatched] = useState(false);
 
   useEffect(() => {
-    const fetchServices = async () => {
+    const fetchServicesAndVehicles = async () => {
       try {
         setLoading(true);
-        const [pendingData, completedData] = await Promise.all([
+        const [pendingData, completedData, vehiclesData] = await Promise.all([
           getPendingServices(),
-          getCompletedServices()
+          getCompletedServices(),
+          getAllVehicles()
         ]);
         
+        setVehicles(vehiclesData || []);
+        if (vehiclesData && vehiclesData.length > 0) {
+          setNewRecord(prev => ({ ...prev, vehicleId: vehiclesData[0].id.toString() }));
+        }
+
         const mappedServices = (pendingData || []).map(s => ({
           id: s.id,
           type: s.serviceType,
@@ -30,7 +45,7 @@ const AdminServices = () => {
           iconClass: s.serviceType === 'Sửa chữa' ? 'ph ph-warning text-red-600 bg-red-50' : 'ph ph-wrench text-blue-600 bg-blue-50',
           status: s.status,
           statusClass: s.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-blue-100 text-blue-700',
-          date: s.serviceDate ? new Date(s.serviceDate).toLocaleDateString('vi-VN') : 'N/A',
+          date: s.scheduledDate ? new Date(s.scheduledDate).toLocaleDateString('vi-VN') : 'N/A',
           location: 'Trạm EVShare',
           cost: s.cost || 0,
           images: []
@@ -42,7 +57,7 @@ const AdminServices = () => {
           car: s.vehicle?.model || 'Unknown',
           group: `Nhóm #EV-${s.vehicle?.id?.toString().padStart(3, '0')}`,
           service: s.description,
-          date: s.serviceDate ? new Date(s.serviceDate).toLocaleDateString('vi-VN') : 'N/A',
+          date: (s.completedDate || s.scheduledDate) ? new Date(s.completedDate || s.scheduledDate).toLocaleDateString('vi-VN') : 'N/A',
           cost: s.cost || 0,
           staff: 'Hệ thống EVShare'
         }));
@@ -53,7 +68,12 @@ const AdminServices = () => {
         setLoading(false);
       }
     };
-    fetchServices();
+    fetchServicesAndVehicles();
+
+    // Listen for custom event from Header
+    const handleOpenModal = () => setShowRecordModal(true);
+    document.addEventListener('openCreateServiceModal', handleOpenModal);
+    return () => document.removeEventListener('openCreateServiceModal', handleOpenModal);
   }, []);
 
   const formatCurrency = (value) => {
@@ -86,6 +106,47 @@ const AdminServices = () => {
     alert('🚒 Đã điều phối xe cứu hộ chuyên dụng 24/7 đến để kéo xe về trung tâm kỹ thuật.');
   };
 
+  const handleCreateTemplate = async () => {
+    if (!newTemplate.name || !newTemplate.estimatedCost) {
+      alert("Vui lòng nhập Tên dịch vụ và Chi phí dự kiến!");
+      return;
+    }
+    try {
+      await createServiceTemplate({
+        name: newTemplate.name,
+        description: newTemplate.description,
+        estimatedCost: parseFloat(newTemplate.estimatedCost)
+      });
+      alert("✅ Tạo dịch vụ mẫu thành công!");
+      setShowTemplateModal(false);
+      setNewTemplate({ name: '', description: '', estimatedCost: '' });
+    } catch (e) {
+      alert("❌ Có lỗi xảy ra khi tạo dịch vụ mẫu.");
+    }
+  };
+
+  const handleCreateRecord = async () => {
+    if (!newRecord.vehicleId || !newRecord.description || !newRecord.cost || !newRecord.scheduledDate) {
+      alert("Vui lòng nhập đủ thông tin bắt buộc!");
+      return;
+    }
+    try {
+      await createServiceRecord({
+        vehicleId: parseInt(newRecord.vehicleId),
+        serviceType: newRecord.serviceType,
+        description: newRecord.description,
+        cost: parseFloat(newRecord.cost),
+        scheduledDate: newRecord.scheduledDate
+      });
+      alert("✅ Đã tạo lịch dịch vụ mới thành công!");
+      setShowRecordModal(false);
+      // Reload services (a full page reload is simplest for now, or just re-fetch)
+      window.location.reload();
+    } catch (e) {
+      alert("❌ Có lỗi xảy ra khi tạo lịch dịch vụ.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -109,11 +170,144 @@ const AdminServices = () => {
         
         {/* Simple indicators */}
         <div className="flex items-center gap-4 text-xs font-bold text-slate-500">
+          <button 
+            onClick={() => setShowTemplateModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors cursor-pointer"
+          >
+            <i className="ph ph-plus-circle text-lg"></i> Thêm Dịch vụ mẫu
+          </button>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-500"></span> {services.length} Đang chờ
           </div>
         </div>
       </div>
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-ink text-lg">Tạo Dịch vụ Mẫu mới</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Tên Dịch vụ</label>
+                <input 
+                  type="text" 
+                  value={newTemplate.name}
+                  onChange={e => setNewTemplate({...newTemplate, name: e.target.value})}
+                  placeholder="VD: Thay lọc gió điều hòa"
+                  className="w-full border-slate-200 rounded-lg text-sm p-2 border"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Mô tả chi tiết</label>
+                <textarea 
+                  value={newTemplate.description}
+                  onChange={e => setNewTemplate({...newTemplate, description: e.target.value})}
+                  className="w-full border-slate-200 rounded-lg text-sm p-2 border min-h-[60px]"
+                ></textarea>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chi phí dự kiến (VNĐ)</label>
+                <input 
+                  type="number" 
+                  value={newTemplate.estimatedCost}
+                  onChange={e => setNewTemplate({...newTemplate, estimatedCost: e.target.value})}
+                  placeholder="VD: 500000"
+                  className="w-full border-slate-200 rounded-lg text-sm p-2 border"
+                />
+              </div>
+              <button 
+                onClick={handleCreateTemplate}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg shadow-sm transition-colors"
+              >
+                Lưu dịch vụ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRecordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-ink text-lg">Tạo Lịch Dịch Vụ Xe</h3>
+              <button onClick={() => setShowRecordModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chọn Xe</label>
+                <select 
+                  value={newRecord.vehicleId} 
+                  onChange={e => setNewRecord({...newRecord, vehicleId: e.target.value})}
+                  className="w-full border-slate-200 rounded-lg text-sm focus:ring-brand-500 focus:border-brand-500 p-2 border"
+                >
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>
+                      Xe #{v.id} - {v.licensePlate} ({v.model})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Loại dịch vụ</label>
+                  <select 
+                    value={newRecord.serviceType} 
+                    onChange={e => setNewRecord({...newRecord, serviceType: e.target.value})}
+                    className="w-full border-slate-200 rounded-lg text-sm p-2 border"
+                  >
+                    <option value="Bảo dưỡng">Bảo dưỡng</option>
+                    <option value="Đăng kiểm">Đăng kiểm</option>
+                    <option value="Vệ sinh">Vệ sinh</option>
+                    <option value="Sửa chữa">Sửa chữa</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chi phí dự kiến</label>
+                  <input 
+                    type="number" 
+                    value={newRecord.cost}
+                    onChange={e => setNewRecord({...newRecord, cost: e.target.value})}
+                    placeholder="VNĐ"
+                    className="w-full border-slate-200 rounded-lg text-sm p-2 border"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Mô tả (Nội dung chi tiết)</label>
+                <textarea 
+                  value={newRecord.description}
+                  onChange={e => setNewRecord({...newRecord, description: e.target.value})}
+                  placeholder="Ví dụ: Thay dầu động cơ, lọc gió..."
+                  className="w-full border-slate-200 rounded-lg text-sm p-2 border min-h-[60px]"
+                ></textarea>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Ngày giờ dự kiến</label>
+                <input 
+                  type="datetime-local" 
+                  value={newRecord.scheduledDate}
+                  onChange={e => setNewRecord({...newRecord, scheduledDate: e.target.value})}
+                  className="w-full border-slate-200 rounded-lg text-sm p-2 border"
+                />
+              </div>
+              <button 
+                onClick={handleCreateRecord}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold py-2.5 rounded-lg shadow-sm transition-colors mt-2"
+              >
+                Xác nhận tạo lịch
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search Input for smaller viewports */}
       <div className="block sm:hidden">
