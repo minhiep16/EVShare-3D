@@ -1,14 +1,14 @@
 import React from 'react';
 import Vehicle3D from './Vehicle3D';
 
-const VehicleHero = ({ vehicle, coOwnersCount, ownershipPercentage, onBookNow }) => {
+const VehicleHero = ({ vehicle, coOwnersCount, coOwners, ownershipPercentage, onBookNow }) => {
   if (!vehicle) return null;
 
   return (
     <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="grid grid-cols-1 lg:grid-cols-2">
         <div className="relative h-64 lg:h-auto bg-slate-950 flex items-center justify-center overflow-hidden">
-          <Vehicle3D />
+          <Vehicle3D vehicle={vehicle} coOwners={coOwners} ownershipPercentage={ownershipPercentage} />
           <span className="absolute top-4 left-4 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-xs font-medium text-brand-600 z-10">
             <span className="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse"></span>
             {vehicle.status || 'Sẵn sàng'}

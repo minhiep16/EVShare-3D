@@ -7,7 +7,8 @@ const Sidebar = ({
   notificationCount,
   currentRole,
   hasVehicle = true,
-  onLogout 
+  onLogout,
+  onDepositWalletClick
 }) => {
 
   const userMenuItems = [
@@ -24,6 +25,7 @@ const Sidebar = ({
 
   const adminMenuItems = [
     { id: 'admin_dashboard', label: 'Dashboard Admin', icon: 'ph-squares-four' },
+    { id: 'admin_users', label: 'Duyệt tài khoản', icon: 'ph-shield-check' },
     { id: 'admin_vehicles', label: 'Quản lý nhóm xe', icon: 'ph-cars' },
     { id: 'admin_contracts', label: 'Hợp đồng pháp lý', icon: 'ph-file-text' },
     { id: 'admin_checkin', label: 'Check-in / Check-out', icon: 'ph-qr-code' }
@@ -113,7 +115,24 @@ const Sidebar = ({
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">{currentUser?.name}</p>
-            <p className="text-xs text-slate-400 truncate">{currentUser?.role}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs text-slate-400 truncate">{currentUser?.role}</span>
+              {isUserMode && (
+                <span className="text-[11px] text-[#22c55e] font-bold flex items-center gap-1">
+                  Ví: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(currentUser?.walletBalance || 0)}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onDepositWalletClick) onDepositWalletClick();
+                    }}
+                    className="w-4 h-4 bg-[#22c55e] hover:bg-[#16a34a] text-white rounded flex items-center justify-center text-[10px] font-bold cursor-pointer transition-colors"
+                    title="Nạp tiền ví cá nhân"
+                  >
+                    +
+                  </button>
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <button 

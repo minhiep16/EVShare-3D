@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-const Vehicle3D = () => {
+const Vehicle3D = ({ vehicle, coOwners, ownershipPercentage }) => {
   const mountRef = useRef(null);
   const [activeTooltip, setActiveTooltip] = useState(null);
   const [isInteracting, setIsInteracting] = useState(false);
@@ -169,10 +169,80 @@ const Vehicle3D = () => {
     const wheelHotspot = createHotspot(1.25, 0.95, 1.05, 'wheel', 0x3b82f6);   // Blue front wheel
     const cabinHotspot = createHotspot(-0.2, 1.4, 0, 'cabin', 0xf59e0b);       // Amber glass roof
 
+    // LED Neon Underglow Setup
+    const batteryPct = vehicle?.batteryPercentage || 78;
+    let neonColorHex = 0x22c55e;
+    if (batteryPct < 30) {
+      neonColorHex = 0xef4444;
+    } else if (batteryPct <= 70) {
+      neonColorHex = 0xf59e0b;
+    }
+
+    const underglowLight = new THREE.PointLight(neonColorHex, 2.5, 3.5);
+    underglowLight.position.set(0, 0.1, 0);
+    carGroup.add(underglowLight);
+
+    const neonGeo = new THREE.PlaneGeometry(3.6, 1.6);
+    const neonMat = new THREE.MeshBasicMaterial({
+      color: neonColorHex,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide
+    });
+    const neonMesh = new THREE.Mesh(neonGeo, neonMat);
+    neonMesh.rotateX(-Math.PI / 2);
+    neonMesh.position.set(0, 0.02, 0);
+    carGroup.add(neonMesh);
+
     // 7. Grid Floor
     const grid = new THREE.GridHelper(15, 15, 0x16a34a, 0xe2e8f0);
     grid.position.y = 0.01;
     scene.add(grid);
+
+    // 7.5. Ownership Segmented Ring
+    const ownershipGroup = new THREE.Group();
+    scene.add(ownershipGroup);
+
+    const ringPalette = [0x22c55e, 0x3b82f6, 0xf59e0b, 0xec4899, 0x8b5cf6, 0x06b6d4];
+    const activeCoOwners = coOwners && coOwners.length > 0 ? coOwners : [
+      { id: '1', name: 'Bạn', ownershipPercentage: ownershipPercentage || 40 },
+      { id: '2', name: 'Thành viên B', ownershipPercentage: 35 },
+      { id: '3', name: 'Thành viên C', ownershipPercentage: 25 }
+    ];
+
+    let currentAngle = 0;
+    activeCoOwners.forEach((owner, idx) => {
+      const pct = owner.ownershipPercentage || 0;
+      if (pct <= 0) return;
+
+      const segmentAngle = (pct / 100.0) * (Math.PI * 2);
+      
+      const ringGeo = new THREE.RingGeometry(2.35, 2.45, 64, 1, currentAngle, segmentAngle);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ringPalette[idx % ringPalette.length],
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+      });
+      const segmentMesh = new THREE.Mesh(ringGeo, ringMat);
+      segmentMesh.rotateX(-Math.PI / 2);
+      segmentMesh.position.set(0, 0.03, 0);
+      ownershipGroup.add(segmentMesh);
+
+      const midAngle = currentAngle + (segmentAngle / 2);
+      const radius = 2.4;
+      const markerGeo = new THREE.SphereGeometry(0.08, 16, 16);
+      const markerMat = new THREE.MeshBasicMaterial({
+        color: ringPalette[idx % ringPalette.length]
+      });
+      const markerMesh = new THREE.Mesh(markerGeo, markerMat);
+      markerMesh.position.set(Math.cos(midAngle) * radius, 0.05, Math.sin(midAngle) * radius);
+      markerMesh.name = `owner_marker_${owner.id}_${pct}_${owner.name}`;
+      ownershipGroup.add(markerMesh);
+
+      currentAngle += segmentAngle;
+    });
 
     // 8. OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -204,13 +274,19 @@ const Vehicle3D = () => {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(carGroup.children, true);
+      const intersects = raycaster.intersectObjects(scene.children, true);
 
       if (intersects.length > 0) {
         const clickedObj = intersects[0].object;
         if (clickedObj.name.startsWith('hotspot_')) {
           const id = clickedObj.name.replace('hotspot_', '');
           setActiveTooltip(id);
+        } else if (clickedObj.name.startsWith('owner_marker_')) {
+          const parts = clickedObj.name.split('_');
+          const ownerId = parts[2];
+          const pct = parts[3];
+          const name = parts[4];
+          setActiveTooltip({ type: 'owner', id: ownerId, pct: pct, name: name });
         }
       }
     };
@@ -226,19 +302,28 @@ const Vehicle3D = () => {
       if (!isInteracting) {
         carGroup.rotation.y += 0.006;
       }
+      
+      // Auto rotation of ownership ring (always rotates slowly)
+      ownershipGroup.rotation.y += 0.003;
 
       // Rotate wheels to simulate movement
+      const isMoving = vehicle?.status === 'IN_USE';
+      const rotationSpeed = isMoving ? 0.15 : 0.02;
       wheels.forEach((w) => {
-        w.children[0].rotation.z += 0.02;
-        w.children[1].rotation.z += 0.02;
+        w.children[0].rotation.z += rotationSpeed;
+        w.children[1].rotation.z += rotationSpeed;
       });
 
-      // Pulsing effect for hotspots
+      // Pulsing effect for hotspots & underglow neon
       angle += 0.05;
       const pulse = 0.8 + Math.sin(angle) * 0.25;
       batteryHotspot.scale.set(pulse, pulse, pulse);
       wheelHotspot.scale.set(pulse, pulse, pulse);
       cabinHotspot.scale.set(pulse, pulse, pulse);
+      
+      if (neonMat) {
+        neonMat.opacity = 0.45 + Math.sin(angle * 1.5) * 0.2;
+      }
 
       controls.update();
       renderer.render(scene, camera);
@@ -265,7 +350,7 @@ const Vehicle3D = () => {
       renderer.dispose();
       if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
     };
-  }, [isInteracting]);
+  }, [isInteracting, vehicle, coOwners, ownershipPercentage]);
 
   const closeTooltip = () => setActiveTooltip(null);
 
@@ -288,7 +373,7 @@ const Vehicle3D = () => {
                 <div className="w-9 h-9 rounded-lg bg-green-50 text-brand-600 flex items-center justify-center text-lg"><i className="ph ph-battery-charging"></i></div>
                 <div>
                   <h4 className="text-xs font-semibold text-slate-400">Trạng thái Pin</h4>
-                  <p className="text-sm font-bold text-ink">78% · Sức khỏe Pin tốt</p>
+                  <p className="text-sm font-bold text-ink">{vehicle?.batteryPercentage || 78}% · Sức khỏe Pin tốt</p>
                 </div>
               </>
             )}
@@ -297,7 +382,7 @@ const Vehicle3D = () => {
                 <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-lg"><i className="ph ph-gauge"></i></div>
                 <div>
                   <h4 className="text-xs font-semibold text-slate-400">Hành trình xe (Odo)</h4>
-                  <p className="text-sm font-bold text-ink">12,400 km · Lốp trước 2.3 bar</p>
+                  <p className="text-sm font-bold text-ink">{new Intl.NumberFormat('vi-VN').format(vehicle?.odometer || 12400)} km · Lốp trước 2.3 bar</p>
                 </div>
               </>
             )}
@@ -306,7 +391,16 @@ const Vehicle3D = () => {
                 <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-lg"><i className="ph ph-users-three"></i></div>
                 <div>
                   <h4 className="text-xs font-semibold text-slate-400">Tỉ lệ sở hữu xe</h4>
-                  <p className="text-sm font-bold text-ink">40% (Bạn) · Quyền Admin chính</p>
+                  <p className="text-sm font-bold text-ink">{ownershipPercentage || 40}% (Bạn) · Quyền sở hữu đồng thuận</p>
+                </div>
+              </>
+            )}
+            {activeTooltip?.type === 'owner' && (
+              <>
+                <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg"><i className="ph ph-user"></i></div>
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400">Cổ đông phương tiện</h4>
+                  <p className="text-sm font-bold text-ink">{activeTooltip.name} · {activeTooltip.pct}% cổ phần</p>
                 </div>
               </>
             )}

@@ -56,37 +56,99 @@ public class AuthController {
         if (request.getPhone() == null || request.getPassword() == null || request.getFullName() == null) {
             return ResponseEntity.badRequest().body("Vui lòng điền đầy đủ các thông tin bắt buộc.");
         }
+
+        // Validate Vietnamese phone number format strictly
+        String phone = request.getPhone().trim();
+        if (!phone.matches("^(0|\\+84|84)(3|5|7|8|9)\\d{8}$")) {
+            return ResponseEntity.badRequest().body("Số điện thoại không đúng định dạng Việt Nam (phải bắt đầu bằng 0, 84 hoặc +84 và gồm 10 chữ số).");
+        }
         
-        if (userRepository.existsByUsername(request.getPhone())) {
+        if (userRepository.existsByUsername(phone)) {
             return ResponseEntity.badRequest().body("Số điện thoại này đã được đăng ký trên hệ thống!");
+        }
+
+        // Validate mandatory document images (CCCD Front, CCCD Back, GPLX)
+        if (request.getCccdImageUrl() == null || request.getCccdImageUrl().trim().isEmpty() ||
+            request.getCccdBackImageUrl() == null || request.getCccdBackImageUrl().trim().isEmpty() ||
+            request.getGplxImageUrl() == null || request.getGplxImageUrl().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Vui lòng chụp và tải lên đầy đủ: ảnh CCCD mặt trước, CCCD mặt sau và Giấy phép lái xe.");
         }
 
         User newUser = User.builder()
                 .name(request.getFullName())
-                .username(request.getPhone())
-                .phone(request.getPhone())
+                .username(phone)
+                .phone(phone)
                 .email(request.getEmail() != null && !request.getEmail().trim().isEmpty() 
                         ? request.getEmail() 
-                        : request.getPhone() + "@evshare.vn")
+                        : phone + "@evshare.vn")
                 .cccd(request.getCccd())
                 .gplx(request.getGplx())
                 .cccdImageUrl(request.getCccdImageUrl())
+                .cccdBackImageUrl(request.getCccdBackImageUrl())
                 .gplxImageUrl(request.getGplxImageUrl())
                 .password(request.getPassword())
-                .role(request.getRole() != null ? request.getRole() : "USER")
-                .avatarUrl(request.getRole() != null && request.getRole().equals("ADMIN") 
-                        ? "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg" 
-                        : "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
+                .role("USER") // Hardcoded security role
+                .avatarUrl("https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
                 .ownershipPercentage(0.0)
                 .isGroupLeader(false)
                 .walletBalance(0.0)
-                .status(User.UserStatus.ACTIVE)
+                .status(User.UserStatus.PENDING_APPROVAL)
                 .version(0)
                 .build();
 
         User saved = userRepository.save(newUser);
         String token = jwtUtil.generateToken(saved.getUsername(), saved.getId(), saved.getRole());
         return ResponseEntity.ok(new JwtResponse(token, saved));
+    }
+
+    @PostMapping("/ocr-cccd")
+    public ResponseEntity<?> ocrCccd(@RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file) {
+        try {
+            Thread.sleep(1200); // Simulate network & OCR processing latency
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        String[] names = {
+            "Nguyễn Hoàng Nam", 
+            "Trần Thị Mai Anh", 
+            "Lê Minh Hùng", 
+            "Phạm Quốc Bảo", 
+            "Nguyễn Thu Thảo",
+            "Đặng Minh Triết",
+            "Phan Thanh Hằng",
+            "Vũ Hoàng Giang"
+        };
+        String[] addresses = {
+            "Hai Bà Trưng, Hà Nội", 
+            "Quận 1, TP. Hồ Chí Minh", 
+            "Ngũ Hành Sơn, Đà Nẵng", 
+            "Hồng Bàng, Hải Phòng", 
+            "Ninh Kiều, Cần Thơ"
+        };
+
+        java.util.Random rand = new java.util.Random();
+        String name = names[rand.nextInt(names.length)];
+        String address = addresses[rand.nextInt(addresses.length)];
+        
+        StringBuilder cccdBuilder = new StringBuilder("037");
+        for (int i = 0; i < 9; i++) {
+            cccdBuilder.append(rand.nextInt(10));
+        }
+        String cccd = cccdBuilder.toString();
+
+        int birthYear = 1985 + rand.nextInt(20);
+        int birthMonth = 1 + rand.nextInt(12);
+        int birthDay = 1 + rand.nextInt(28);
+        String dob = String.format("%02d/%02d/%d", birthDay, birthMonth, birthYear);
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("fullName", name);
+        response.put("cccd", cccd);
+        response.put("dob", dob);
+        response.put("address", address);
+
+        return ResponseEntity.ok(response);
     }
 
     @Data
@@ -103,9 +165,9 @@ public class AuthController {
         private String cccd;
         private String gplx;
         private String cccdImageUrl;
+        private String cccdBackImageUrl;
         private String gplxImageUrl;
         private String password;
-        private String role;
     }
 
     @Data

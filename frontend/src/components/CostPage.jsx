@@ -5,15 +5,44 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
   const [selectedMethod, setSelectedMethod] = useState('wallet');
   const [filterType, setFilterType] = useState('Tất cả');
 
-  // Find the personal pending transaction (TRIP_FEE)
-  const personalPendingTx = transactions.find(t => t.status === 'PENDING' && t.type === 'TRIP_FEE' && String(t.userId) === String(currentUser?.id));
-  // Find group pending transactions
-  const groupPendingTx = transactions.find(t => t.status === 'PENDING' && t.type !== 'TRIP_FEE');
-  
-  const pendingTx = personalPendingTx || groupPendingTx;
-  
-  const unpaidAmount = (personalPendingTx ? personalPendingTx.amount : 0) + 
-                       (groupPendingTx ? groupPendingTx.amount * (currentUser?.ownershipPercentage || 0) / 100 : 0);
+  // Helper to calculate cost share for a transaction for a given member
+  const getTransactionShare = (tx, member) => {
+    if (!tx || !member) return 0;
+    
+    // If the transaction is specifically assigned to a user
+    if (tx.userId !== null && tx.userId !== undefined) {
+      return String(tx.userId) === String(member.id) ? tx.amount : 0;
+    }
+    
+    // If the transaction is a general group transaction (userId is null)
+    const isMaintenance = tx.type === 'MAINTENANCE' || 
+                          (tx.categoryName && (tx.categoryName.includes('Bảo dưỡng') || tx.categoryName.includes('Sửa chữa') || tx.categoryName.includes('pin')));
+                          
+    if (isMaintenance) {
+      // Calculate weights: W_i = 1 / P_i
+      const weights = coOwners.map(owner => {
+        const pct = owner.ownershipPercentage || 0;
+        return {
+          id: owner.id,
+          weight: pct > 0 ? (1.0 / pct) : 0.0
+        };
+      });
+      
+      const sumWeights = weights.reduce((sum, w) => sum + w.weight, 0);
+      if (sumWeights === 0) return 0;
+      
+      const userWeight = weights.find(w => w.id === member.id)?.weight || 0;
+      return tx.amount * (userWeight / sumWeights);
+    } else {
+      // Regular cost split directly by ownership percentage
+      return tx.amount * (member.ownershipPercentage || 0) / 100;
+    }
+  };
+
+  // Find all pending transactions where this user owes money
+  const pendingTxList = transactions.filter(t => t.status === 'PENDING' && getTransactionShare(t, currentUser) > 0);
+  const pendingTx = pendingTxList[0] || null;
+  const unpaidAmount = pendingTx ? getTransactionShare(pendingTx, currentUser) : 0;
 
   const handlePayment = async () => {
     if (!pendingTx) {
@@ -466,12 +495,17 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
           )}
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-            <h3 className="text-base font-semibold mb-4">Phân chia chi phí</h3>
+            <h3 className="text-base font-semibold mb-4">
+              {pendingTx ? "Phân chia chi phí chờ thanh toán" : "Phân chia chi phí tích lũy"}
+            </h3>
             <div className="space-y-3">
               {coOwners.map((owner, idx) => {
-                const ownerShare = totalCost * (owner.ownershipPercentage || 0) / 100;
+                const ownerShare = pendingTx 
+                  ? getTransactionShare(pendingTx, owner)
+                  : (totalCost * (owner.ownershipPercentage || 0) / 100);
+
                 const color = colors[idx % colors.length];
-                const isOwe = pendingTx && owner.id === currentUser?.id && unpaidAmount > 0;
+                const owesThisTx = pendingTx && getTransactionShare(pendingTx, owner) > 0;
                 
                 return (
                   <div key={owner.id} className="flex items-center gap-3">
@@ -479,15 +513,25 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm mb-1">
                         <span className="font-medium text-ink">{owner.name}</span>
-                        <span className={`font-semibold ${isOwe ? 'text-amber-600' : 'text-[#16a34a]'}`}>
+                        <span className={`font-semibold ${owesThisTx ? 'text-amber-600' : 'text-[#16a34a]'}`}>
                           {formatCurrency(ownerShare)}
                         </span>
                       </div>
                       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${isOwe ? 'bg-amber-400' : color.bg}`} style={{ width: `${owner.ownershipPercentage}%` }}></div>
+                        <div 
+                          className={`h-full rounded-full ${owesThisTx ? 'bg-amber-400' : color.bg}`} 
+                          style={{ 
+                            width: pendingTx 
+                              ? `${pendingTx.amount > 0 ? (ownerShare / pendingTx.amount) * 100 : 0}%` 
+                              : `${owner.ownershipPercentage}%` 
+                          }}
+                        ></div>
                       </div>
-                      <p className={`text-[11px] mt-0.5 ${isOwe ? 'text-amber-500' : 'text-slate-400'}`}>
-                        {owner.ownershipPercentage}% · {isOwe ? 'Chờ TT' : 'Đã TT'}
+                      <p className={`text-[11px] mt-0.5 ${owesThisTx ? 'text-amber-500' : 'text-slate-400'}`}>
+                        {pendingTx 
+                          ? `Tỉ lệ đóng góp: ${pendingTx.amount > 0 ? ((ownerShare / pendingTx.amount) * 100).toFixed(1) : 0}% · ${owesThisTx ? 'Chờ TT' : 'Đã TT'}`
+                          : `${owner.ownershipPercentage}% cổ phần`
+                        }
                       </p>
                     </div>
                   </div>

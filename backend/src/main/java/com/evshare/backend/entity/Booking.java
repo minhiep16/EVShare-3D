@@ -30,10 +30,11 @@ public class Booking {
     private String purpose;
 
     @Enumerated(EnumType.STRING)
-    private BookingStatus status = BookingStatus.PENDING;
+    private BookingStatus status = BookingStatus.CONFIRMED;
 
     public enum BookingStatus {
         PENDING,
+        CONFIRMED,
         ACTIVE,
         COMPLETED,
         CANCELLED

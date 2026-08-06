@@ -36,7 +36,7 @@ public class AdminController {
     @GetMapping("/users/unassigned")
     public ResponseEntity<List<User>> getUnassignedUsers() {
         List<User> unassigned = userRepository.findAll().stream()
-                .filter(u -> u.getVehicle() == null && "USER".equals(u.getRole()))
+                .filter(u -> u.getVehicle() == null && "USER".equals(u.getRole()) && User.UserStatus.ACTIVE.equals(u.getStatus()))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(unassigned);
     }
@@ -80,6 +80,7 @@ public class AdminController {
 
         user.setVehicle(vehicle);
         user.setOwnershipPercentage(0.0); // Set to 0 initially
+        user.setRequestedVehicleId(null);  // Clear the join request if any
         userRepository.save(user);
 
         return ResponseEntity.ok("User added to vehicle successfully");
@@ -197,15 +198,37 @@ public class AdminController {
             if (mediumCount > 0) breakdown += String.format("Lỗi vừa x%d. ", mediumCount);
             if (heavyCount > 0) breakdown += String.format("Lỗi nặng x%d. ", heavyCount);
 
+            // Deduct from user's personal wallet and add to vehicle's joint fund
+            double currentWallet = user.getWalletBalance() != null ? user.getWalletBalance() : 0.0;
+            double deductedAmount = 0.0;
+            String transactionStatus = "PENDING";
+
+            if (currentWallet >= totalCost) {
+                deductedAmount = totalCost;
+                user.setWalletBalance(currentWallet - totalCost);
+                transactionStatus = "PAID";
+            } else {
+                deductedAmount = currentWallet;
+                user.setWalletBalance(0.0);
+                transactionStatus = "PENDING";
+            }
+
+            if (deductedAmount > 0) {
+                double currentJointFund = vehicle.getJointFundBalance() != null ? vehicle.getJointFundBalance() : 0.0;
+                vehicle.setJointFundBalance(currentJointFund + deductedAmount);
+            }
+
+            userRepository.save(user);
+
             Transaction tx = Transaction.builder()
                     .user(user)
                     .vehicle(vehicle)
                     .type("TRIP_FEE")
                     .categoryName("Phí sử dụng & Phụ phí")
-                    .amount(totalCost)
+                    .amount(totalCost - deductedAmount)
                     .date(request.getTimestamp() != null ? request.getTimestamp().toLocalDate() : java.time.LocalDate.now())
-                    .description(breakdown.trim())
-                    .status(totalCost > 0 ? "PENDING" : "PAID")
+                    .description(breakdown.trim() + (deductedAmount > 0 ? String.format(" (Đã trừ %,.0f VNĐ từ ví cá nhân)", deductedAmount) : ""))
+                    .status(transactionStatus)
                     .build();
             transactionRepository.save(tx);
         }
@@ -223,7 +246,37 @@ public class AdminController {
         return ResponseEntity.ok(checkinLogRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "timestamp")));
     }
 
+    @GetMapping("/users/pending-approval")
+    public ResponseEntity<List<User>> getPendingApprovalUsers() {
+        List<User> pending = userRepository.findAll().stream()
+                .filter(u -> User.UserStatus.PENDING_APPROVAL.equals(u.getStatus()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(pending);
+    }
 
+    @PostMapping("/users/{userId}/approve")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> approveUser(@PathVariable Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+        user.setStatus(User.UserStatus.ACTIVE);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Đã phê duyệt tài khoản thành công!"));
+    }
+
+    @PostMapping("/users/{userId}/reject")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> rejectUser(@PathVariable Long userId) {
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+        user.setStatus(User.UserStatus.SUSPENDED);
+        userRepository.save(user);
+        return ResponseEntity.ok(Map.of("message", "Đã từ chối tài khoản!"));
+    }
 
     @Data
     public static class CheckinRequest {

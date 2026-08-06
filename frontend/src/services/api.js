@@ -41,6 +41,17 @@ export const uploadFile = async (file) => {
   return response.data;
 };
 
+export const simulateOcr = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axios.post(`${API_BASE_URL}/auth/ocr-cccd`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export const castVote = async (voteId, agree = true) => {
   const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`);
   return response.data;
@@ -59,6 +70,21 @@ export const register = async (userData) => {
 // Admin Endpoints
 export const getUnassignedUsers = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/users/unassigned`);
+  return response.data;
+};
+
+export const getPendingApprovalUsers = async () => {
+  const response = await axios.get(`${API_BASE_URL}/admin/users/pending-approval`);
+  return response.data;
+};
+
+export const approveUser = async (userId) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/users/${userId}/approve`);
+  return response.data;
+};
+
+export const rejectUser = async (userId) => {
+  const response = await axios.post(`${API_BASE_URL}/admin/users/${userId}/reject`);
   return response.data;
 };
 
@@ -150,6 +176,21 @@ export const allocateShares = async (vehicleId, sharesData) => {
 
 export const requestJoinVehicle = async (vehicleId) => {
   const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/request-join`);
+  return response.data;
+};
+
+export const approveJoinRequest = async (vehicleId, userId) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/approve-join/${userId}`);
+  return response.data;
+};
+
+export const rejectJoinRequest = async (vehicleId, userId) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/reject-join/${userId}`);
+  return response.data;
+};
+
+export const depositWallet = async (amount) => {
+  const response = await axios.post(`${API_BASE_URL}/users/deposit-wallet`, { amount });
   return response.data;
 };
 

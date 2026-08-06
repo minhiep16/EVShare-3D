@@ -20,7 +20,8 @@ import LoginPage from './components/LoginPage';
 import VehicleCheckin3D from './components/VehicleCheckin3D';
 import AdminVehicles from './components/AdminVehicles';
 import AdminContracts from './components/AdminContracts';
-import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle } from './services/api';
+import AdminUsers from './components/AdminUsers';
+import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle, approveJoinRequest, rejectJoinRequest } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -44,6 +45,11 @@ function App() {
   const [unassignedUsers, setUnassignedUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Deposit Wallet Modal State
+  const [showDepositWalletModal, setShowDepositWalletModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
 
   const fetchDashboard = async (userId) => {
     try {
@@ -205,7 +211,8 @@ function App() {
     vehicle: data?.vehicle,
     isGroupLeader: userProfile?.isGroupLeader || false,
     ownershipPercentage: userProfile?.ownershipPercentage || 0,
-    requestedVehicleId: userProfile?.requestedVehicleId || null
+    requestedVehicleId: userProfile?.requestedVehicleId || null,
+    status: userProfile?.status || currentUserInfo?.status || 'PENDING_APPROVAL'
   };
   const ownershipPercentage = userProfile?.ownershipPercentage || 40;
 
@@ -230,6 +237,7 @@ function App() {
           localStorage.removeItem('evshare_currentUserInfo');
           localStorage.removeItem('evshare_jwt_token');
         }}
+        onDepositWalletClick={() => setShowDepositWalletModal(true)}
       />
 
       {/* Mobile Sidebar overlay */}
@@ -268,6 +276,7 @@ function App() {
                   localStorage.removeItem('evshare_currentUserInfo');
                   localStorage.removeItem('evshare_jwt_token');
                 }}
+                onDepositWalletClick={() => setShowDepositWalletModal(true)}
               />
             </div>
           </div>
@@ -306,6 +315,7 @@ function App() {
                     <VehicleHero 
                       vehicle={data?.vehicle}
                       coOwnersCount={data?.coOwners?.length || 3}
+                      coOwners={data?.coOwners || []}
                       ownershipPercentage={ownershipPercentage}
                       onBookNow={() => setActiveTab('booking')}
                     />
@@ -337,6 +347,22 @@ function App() {
                       />
                     </section>
                   </>
+                ) : currentUser.status === 'PENDING_APPROVAL' ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm max-w-2xl mx-auto mt-8 animate-fade-in">
+                    <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
+                      <i className="ph ph-shield-warning"></i>
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Hồ sơ tài khoản chờ phê duyệt</h3>
+                    <p className="text-sm text-slate-500 mb-6">
+                      Tài khoản của bạn đang trong trạng thái chờ quản trị viên phê duyệt xác minh tài liệu (CCCD & GPLX). 
+                      Chỉ sau khi hồ sơ được duyệt, bạn mới có thể thực hiện xin vào nhóm hoặc được các thành viên khác mời vào nhóm xe.
+                    </p>
+                    <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-600 inline-flex flex-col gap-1 text-left">
+                      <div>• <strong>Họ tên:</strong> {currentUserInfo?.fullName}</div>
+                      <div>• <strong>Số điện thoại:</strong> {currentUserInfo?.phone}</div>
+                      <div>• <strong>Trạng thái:</strong> ⏳ Đang chờ xác minh</div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-6">
                     <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
@@ -462,6 +488,10 @@ function App() {
 
             {activeTab === 'admin_vehicles' && (
               <AdminVehicles />
+            )}
+
+            {activeTab === 'admin_users' && (
+              <AdminUsers />
             )}
 
             {activeTab === 'admin_contracts' && (
@@ -625,48 +655,203 @@ function App() {
               </button>
             </div>
             
-            <div className="p-6">
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Chọn Người dùng</label>
-                {unassignedUsers.length === 0 ? (
-                  <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200">
-                    Hiện không có người dùng nào trống.
+            {(() => {
+              const pendingRequests = unassignedUsers.filter(user => user.requestedVehicleId === data?.vehicle?.id);
+              const otherUsers = unassignedUsers.filter(user => user.requestedVehicleId !== data?.vehicle?.id);
+              return (
+                <div className="p-6 space-y-6">
+                  {/* Section 1: Pending Join Requests */}
+                  {pendingRequests.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        Yêu cầu gia nhập xe này ({pendingRequests.length})
+                      </h4>
+                      <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1">
+                        {pendingRequests.map(user => (
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
+                            <div className="flex items-center gap-2">
+                              <img src={user.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-ink truncate">{user.name || user.username}</p>
+                                <p className="text-[11px] text-slate-400">ID: {user.id} · {user.phone}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                disabled={isSubmitting}
+                                onClick={async () => {
+                                  try {
+                                    setIsSubmitting(true);
+                                    await approveJoinRequest(data?.vehicle?.id, user.id);
+                                    alert('✅ Đã duyệt và thêm thành viên vào xe!');
+                                    const updated = await getUnassignedUsers();
+                                    setUnassignedUsers(updated);
+                                    fetchDashboard(currentUserInfo.id);
+                                  } catch (e) {
+                                    alert('Duyệt thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
+                                  } finally {
+                                    setIsSubmitting(false);
+                                  }
+                                }}
+                                className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-white px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
+                              >
+                                Duyệt
+                              </button>
+                              <button
+                                disabled={isSubmitting}
+                                onClick={async () => {
+                                  try {
+                                    setIsSubmitting(true);
+                                    await rejectJoinRequest(data?.vehicle?.id, user.id);
+                                    alert('❌ Đã từ chối yêu cầu gia nhập.');
+                                    const updated = await getUnassignedUsers();
+                                    setUnassignedUsers(updated);
+                                    fetchDashboard(currentUserInfo.id);
+                                  } catch (e) {
+                                    alert('Từ chối thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
+                                  } finally {
+                                    setIsSubmitting(false);
+                                  }
+                                }}
+                                className="text-xs border border-slate-200 text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
+                              >
+                                Từ chối
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section 2: Add Direct / Other unassigned users */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-slate-700 border-b border-slate-100 pb-2">
+                      Thêm trực tiếp thành viên khác
+                    </h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chọn người dùng</label>
+                      {otherUsers.length === 0 ? (
+                        <div className="p-3 bg-slate-50 text-slate-500 rounded-lg text-xs text-center border border-slate-200">
+                          Không có người dùng trống nào khác.
+                        </div>
+                      ) : (
+                        <select 
+                          value={selectedUserId}
+                          onChange={(e) => setSelectedUserId(e.target.value)}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
+                        >
+                          <option value="">-- Chọn thành viên --</option>
+                          {otherUsers.map(user => (
+                            <option key={user.id} value={user.id}>
+                              {user.name || user.username} (ID: {user.id}) {user.phone ? `· ${user.phone}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    
+                    <button 
+                      onClick={async () => {
+                        if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
+                        try {
+                          setIsSubmitting(true);
+                          await addMemberToVehicle(data?.vehicle?.id, selectedUserId, 0); // 0% by default
+                          alert('✅ Đã thêm thành viên thành công!');
+                          setSelectedUserId('');
+                          setShowAddMemberModal(false);
+                          fetchDashboard(currentUserInfo.id); // reload dashboard
+                        } catch (e) {
+                          alert('Lỗi: ' + (e.response?.data || e.message));
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting || !selectedUserId}
+                      className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
+                    </button>
                   </div>
-                ) : (
-                  <select 
-                    value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Deposit Personal Wallet Modal */}
+      {showDepositWalletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] p-6 flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#22c55e] shrink-0">
+                <i className="ph-fill ph-wallet text-2xl"></i>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-ink mb-1">Nạp tiền Ví cá nhân</h3>
+                <p className="text-sm text-[#16a34a]/80">Nạp số dư để tự động thanh toán khấu hao hành trình & các chi phí phát sinh.</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowDepositWalletModal(false);
+                  setDepositAmount('');
+                }}
+                className="w-8 h-8 rounded-full bg-white/50 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center shrink-0"
+              >
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Số tiền muốn nạp (VNĐ)</label>
+                <input 
+                  type="number" 
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                  placeholder="Nhập số tiền..."
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-semibold text-ink"
+                />
+              </div>
+
+              {/* Quick select buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                {[100000, 200000, 500000, 1000000].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setDepositAmount(val.toString())}
+                    className="py-2 border border-slate-200 hover:border-[#22c55e] hover:bg-[#ecfdf5] rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                   >
-                    <option value="">-- Chọn thành viên --</option>
-                    {unassignedUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name || user.username} (ID: {user.id}) {user.requestedVehicleId === data?.vehicle?.id ? '⭐ Đang xin vào' : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)}
+                  </button>
+                ))}
               </div>
               
               <button 
                 onClick={async () => {
-                  if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
+                  if (!depositAmount || parseFloat(depositAmount) <= 0) {
+                    return alert('Vui lòng nhập số tiền nạp hợp lệ!');
+                  }
                   try {
-                    setIsSubmitting(true);
-                    await addMemberToVehicle(data?.vehicle?.id, selectedUserId, 0); // 0% by default
-                    alert('✅ Đã thêm thành viên thành công!');
-                    setShowAddMemberModal(false);
+                    setIsSubmittingWallet(true);
+                    await depositWallet(parseFloat(depositAmount));
+                    alert('🎉 Nạp tiền vào ví cá nhân thành công!');
+                    setShowDepositWalletModal(false);
+                    setDepositAmount('');
                     fetchDashboard(currentUserInfo.id); // reload dashboard
                   } catch (e) {
-                    alert('Lỗi: ' + (e.response?.data || e.message));
+                    alert('Nạp tiền thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
                   } finally {
-                    setIsSubmitting(false);
+                    setIsSubmittingWallet(false);
                   }
                 }}
-                disabled={isSubmitting || !selectedUserId}
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                disabled={isSubmittingWallet || !depositAmount}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
+                {isSubmittingWallet ? 'Đang xử lý...' : 'Xác nhận Nạp tiền'}
               </button>
             </div>
           </div>

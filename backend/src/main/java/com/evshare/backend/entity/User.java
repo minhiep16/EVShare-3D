@@ -37,6 +37,7 @@ public class User {
 
     // Document scanner OCR resources
     private String cccdImageUrl;
+    private String cccdBackImageUrl;
     private String gplxImageUrl;
 
     // Architecture additions
@@ -56,12 +57,13 @@ public class User {
     }
 
     @Enumerated(EnumType.STRING)
-    private UserStatus status = UserStatus.ACTIVE;
+    private UserStatus status = UserStatus.PENDING_APPROVAL;
 
     @Version
     private Integer version = 0;
 
     public enum UserStatus {
+        PENDING_APPROVAL,
         ACTIVE,
         SUSPENDED
     }

@@ -16,8 +16,10 @@ import java.util.List;
 import java.util.Map;
 import com.evshare.backend.repository.FundTransactionRepository;
 import com.evshare.backend.repository.UserRepository;
+import com.evshare.backend.repository.TransactionRepository;
 import com.evshare.backend.entity.FundTransaction;
 import com.evshare.backend.entity.User;
+import com.evshare.backend.entity.Transaction;
 import org.springframework.transaction.annotation.Transactional;
 
 @RestController
@@ -30,6 +32,7 @@ public class AdminServicesController {
     private final VehicleRepository vehicleRepository;
     private final FundTransactionRepository fundTransactionRepository;
     private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
 
     @PostMapping("")
     public ResponseEntity<ServiceRecord> createServiceRecord(@RequestBody ServiceRecordRequest request) {
@@ -123,13 +126,59 @@ public class AdminServicesController {
                     .user(admin)
                     .type("OUT")
                     .title("Chi trả: " + record.getServiceType())
-                    .description(record.getDescription())
+                    .description(record.getDescription() + " (Đã thanh toán từ Quỹ chung)")
                     .amount(-actualCost)
                     .transactionDate(java.time.LocalDateTime.now())
                     .build();
             fundTransactionRepository.save(tx);
+
+            // Generate cost-sharing transactions for co-owners using inverse ownership percentage
+            List<User> coOwners = userRepository.findAll().stream()
+                    .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(vehicle.getId()))
+                    .collect(java.util.stream.Collectors.toList());
+
+            if (!coOwners.isEmpty()) {
+                double sumWeights = 0.0;
+                for (User owner : coOwners) {
+                    double pct = owner.getOwnershipPercentage() != null ? owner.getOwnershipPercentage() : 0.0;
+                    if (pct > 0) {
+                        sumWeights += (1.0 / pct);
+                    }
+                }
+
+                if (sumWeights > 0) {
+                    for (User owner : coOwners) {
+                        double pct = owner.getOwnershipPercentage() != null ? owner.getOwnershipPercentage() : 0.0;
+                        if (pct > 0) {
+                            double weight = 1.0 / pct;
+                            double shareRatio = weight / sumWeights;
+                            double userShare = actualCost * shareRatio;
+
+                            String desc = String.format(
+                                "Chia sẻ phí dịch vụ: %s. Tổng chi phí: %,.0f VNĐ. Cổ phần của bạn: %,.1f%%. Tỉ lệ đóng góp nghịch đảo: %,.2f%%.",
+                                record.getServiceType(),
+                                actualCost,
+                                pct,
+                                shareRatio * 100
+                            );
+
+                            Transaction memberTx = Transaction.builder()
+                                    .user(owner)
+                                    .vehicle(vehicle)
+                                    .type("MAINTENANCE")
+                                    .categoryName("Bảo dưỡng & Nâng cấp")
+                                    .amount(userShare)
+                                    .date(java.time.LocalDate.now())
+                                    .description(desc)
+                                    .status("PENDING")
+                                    .build();
+                            transactionRepository.save(memberTx);
+                        }
+                    }
+                }
+            }
         }
 
-        return ResponseEntity.ok(Map.of("message", "Đã hoàn thành dịch vụ và tự động trừ quỹ chung!"));
+        return ResponseEntity.ok(Map.of("message", "Đã hoàn thành dịch vụ, trừ quỹ chung và tạo hóa đơn chia sẻ chi phí!"));
     }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleGroups, getUnassignedUsers, addMemberToVehicle } from '../services/api';
+import { getVehicleGroups, getUnassignedUsers, addMemberToVehicle, approveJoinRequest, rejectJoinRequest } from '../services/api';
 
 const AdminVehicles = () => {
   const [vehicleGroups, setVehicleGroups] = useState([]);
@@ -261,50 +261,128 @@ const AdminVehicles = () => {
               </button>
             </div>
             
-            <div className="p-6">
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Chọn Người dùng</label>
-                {unassignedUsers.length === 0 ? (
-                  <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200">
-                    Hiện không có người dùng nào trống (chưa vào nhóm xe).
+            {(() => {
+              const pendingRequests = unassignedUsers.filter(user => user.requestedVehicleId === selectedVehicleId);
+              const otherUsers = unassignedUsers.filter(user => user.requestedVehicleId !== selectedVehicleId);
+              return (
+                <div className="p-6 space-y-6">
+                  {/* Section 1: Pending Join Requests */}
+                  {pendingRequests.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-bold text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                        Yêu cầu gia nhập xe này ({pendingRequests.length})
+                      </h4>
+                      <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1">
+                        {pendingRequests.map(user => (
+                          <div key={user.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
+                            <div className="flex items-center gap-2">
+                              <img src={user.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-semibold text-ink truncate">{user.name || user.username}</p>
+                                <p className="text-[11px] text-slate-400">ID: {user.id} · {user.phone}</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                              <button
+                                disabled={isSubmitting}
+                                onClick={async () => {
+                                  try {
+                                    setIsSubmitting(true);
+                                    await approveJoinRequest(selectedVehicleId, user.id);
+                                    alert('✅ Đã duyệt và thêm thành viên vào xe!');
+                                    const updated = await getUnassignedUsers();
+                                    setUnassignedUsers(updated);
+                                    fetchData();
+                                  } catch (e) {
+                                    alert('Duyệt thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
+                                  } finally {
+                                    setIsSubmitting(false);
+                                  }
+                                }}
+                                className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-white px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
+                              >
+                                Duyệt
+                              </button>
+                              <button
+                                disabled={isSubmitting}
+                                onClick={async () => {
+                                  try {
+                                    setIsSubmitting(true);
+                                    await rejectJoinRequest(selectedVehicleId, user.id);
+                                    alert('❌ Đã từ chối yêu cầu gia nhập.');
+                                    const updated = await getUnassignedUsers();
+                                    setUnassignedUsers(updated);
+                                    fetchData();
+                                  } catch (e) {
+                                    alert('Từ chối thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
+                                  } finally {
+                                    setIsSubmitting(false);
+                                  }
+                                }}
+                                className="text-xs border border-slate-200 text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
+                              >
+                                Từ chối
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section 2: Add Direct / Other unassigned users */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-bold text-slate-700 border-b border-slate-100 pb-2">
+                      Thêm trực tiếp thành viên khác
+                    </h4>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chọn người dùng</label>
+                      {otherUsers.length === 0 ? (
+                        <div className="p-3 bg-slate-50 text-slate-500 rounded-lg text-xs text-center border border-slate-200">
+                          Không có người dùng trống nào khác.
+                        </div>
+                      ) : (
+                        <select 
+                          value={selectedUserId}
+                          onChange={(e) => setSelectedUserId(e.target.value)}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
+                        >
+                          <option value="">-- Chọn thành viên --</option>
+                          {otherUsers.map(user => (
+                            <option key={user.id} value={user.id}>
+                              {user.name || user.username} (ID: {user.id}) {user.phone ? `· ${user.phone}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    
+                    <button 
+                      onClick={async () => {
+                        if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
+                        try {
+                          setIsSubmitting(true);
+                          await addMemberToVehicle(selectedVehicleId, selectedUserId, 0); // 0% by default
+                          alert('✅ Đã thêm thành viên thành công!');
+                          setSelectedUserId('');
+                          setShowAddMemberModal(false);
+                          fetchData(); // reload table
+                        } catch (e) {
+                          alert('Lỗi: ' + (e.response?.data || e.message));
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={isSubmitting || !selectedUserId}
+                      className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
+                    </button>
                   </div>
-                ) : (
-                  <select 
-                    value={selectedUserId}
-                    onChange={(e) => setSelectedUserId(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
-                  >
-                    <option value="">-- Chọn thành viên --</option>
-                    {unassignedUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.name || user.username} (ID: {user.id}) {user.requestedVehicleId === selectedVehicleId ? '⭐ Đang xin vào' : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              
-              <button 
-                onClick={async () => {
-                  if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
-                  try {
-                    setIsSubmitting(true);
-                    await addMemberToVehicle(selectedVehicleId, selectedUserId, 0); // 0% by default
-                    alert('✅ Đã thêm thành viên thành công!');
-                    setShowAddMemberModal(false);
-                    fetchData(); // reload table
-                  } catch (e) {
-                    alert('Lỗi: ' + (e.response?.data || e.message));
-                  } finally {
-                    setIsSubmitting(false);
-                  }
-                }}
-                disabled={isSubmitting || !selectedUserId}
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
-              </button>
-            </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

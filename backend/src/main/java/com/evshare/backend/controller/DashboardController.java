@@ -137,6 +137,9 @@ public class DashboardController {
         if (user == null) {
             return ResponseEntity.badRequest().body("User not found");
         }
+        if (User.UserStatus.PENDING_APPROVAL.equals(user.getStatus())) {
+            return ResponseEntity.badRequest().body("Tài khoản của bạn đang chờ quản trị viên phê duyệt hồ sơ. Bạn chỉ có thể xin vào nhóm xe sau khi tài khoản được kích hoạt.");
+        }
         Vehicle vehicle = vehicleRepository.findById(id).orElse(null);
         if (vehicle == null) {
             return ResponseEntity.badRequest().body("Vehicle not found");
@@ -187,7 +190,7 @@ public class DashboardController {
                 .startTime(bookingRequest.getStartTime())
                 .endTime(bookingRequest.getEndTime())
                 .purpose(bookingRequest.getPurpose())
-                .status(Booking.BookingStatus.PENDING)
+                .status(Booking.BookingStatus.CONFIRMED)
                 .build();
 
         Booking saved = bookingRepository.save(booking);
@@ -335,20 +338,61 @@ public class DashboardController {
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<?> payTransaction(@PathVariable Long id, HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
         Transaction tx = transactionRepository.findById(id).orElse(null);
         if (tx == null) return ResponseEntity.badRequest().body("Giao dịch không tồn tại.");
         
         if (tx.getUser() != null && !tx.getUser().getId().equals(userId)) {
-            return ResponseEntity.status(403).body("Không có quyền truy cập.");
+            return ResponseEntity.status(403).body("Không có quyền thanh toán giao dịch này.");
         }
 
         if ("PAID".equals(tx.getStatus())) {
-            return ResponseEntity.badRequest().body("Giao dịch đã được thanh toán.");
+            return ResponseEntity.badRequest().body("Giao dịch đã được thanh toán trước đó.");
+        }
+
+        double amount = tx.getAmount() != null ? tx.getAmount() : 0.0;
+        double currentWallet = user.getWalletBalance() != null ? user.getWalletBalance() : 0.0;
+
+        if (currentWallet < amount) {
+            return ResponseEntity.badRequest().body("Số dư ví cá nhân không đủ để thanh toán. Vui lòng nạp thêm tiền!");
+        }
+
+        // Deduct from personal wallet
+        user.setWalletBalance(currentWallet - amount);
+        userRepository.save(user);
+
+        // Add back to vehicle's joint fund
+        Vehicle vehicle = tx.getVehicle();
+        if (vehicle != null) {
+            double currentFund = vehicle.getJointFundBalance() != null ? vehicle.getJointFundBalance() : 0.0;
+            vehicle.setJointFundBalance(currentFund + amount);
+            vehicleRepository.save(vehicle);
+            
+            // Record deposit into the vehicle's joint fund logs
+            FundTransaction fundTx = FundTransaction.builder()
+                    .vehicle(vehicle)
+                    .user(user)
+                    .type("IN")
+                    .title("Đóng góp: " + tx.getCategoryName())
+                    .description("Thành viên thanh toán chia sẻ chi phí: " + tx.getDescription())
+                    .amount(amount)
+                    .transactionDate(java.time.LocalDateTime.now())
+                    .build();
+            fundTransactionRepository.save(fundTx);
         }
 
         tx.setStatus("PAID");
         transactionRepository.save(tx);
-        return ResponseEntity.ok(tx);
+        
+        return ResponseEntity.ok(Map.of(
+            "message", "Thanh toán giao dịch thành công!",
+            "transaction", tx,
+            "newWalletBalance", user.getWalletBalance()
+        ));
     }
 
     @GetMapping("/checkin-logs")
@@ -449,5 +493,120 @@ public class DashboardController {
         }
 
         return ResponseEntity.ok(Map.of("message", "Đã cập nhật cổ phần thành công!"));
+    }
+
+    @PostMapping("/vehicles/{vehicleId}/approve-join/{userId}")
+    @Transactional
+    public ResponseEntity<?> approveJoinRequest(@PathVariable Long vehicleId, @PathVariable Long userId, HttpServletRequest request) {
+        Long currentUserId = (Long) request.getAttribute("userId");
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        
+        boolean isAdmin = "ADMIN".equals(currentUser.getRole());
+        boolean isLeaderOfThisVehicle = Boolean.TRUE.equals(currentUser.getIsGroupLeader()) 
+                && currentUser.getVehicle() != null 
+                && currentUser.getVehicle().getId().equals(vehicleId);
+                
+        if (!isAdmin && !isLeaderOfThisVehicle) {
+            return ResponseEntity.status(403).body("Bạn không có quyền duyệt yêu cầu gia nhập cho xe này.");
+        }
+        
+        Vehicle vehicle = vehicleRepository.findById(vehicleId).orElse(null);
+        if (vehicle == null) {
+            return ResponseEntity.badRequest().body("Không tìm thấy xe");
+        }
+        
+        User targetUser = userRepository.findById(userId).orElse(null);
+        if (targetUser == null) {
+            return ResponseEntity.badRequest().body("Không tìm thấy người dùng");
+        }
+        
+        if (!vehicleId.equals(targetUser.getRequestedVehicleId())) {
+            return ResponseEntity.badRequest().body("Người dùng không gửi yêu cầu xin vào xe này");
+        }
+        
+        targetUser.setVehicle(vehicle);
+        targetUser.setOwnershipPercentage(0.0);
+        targetUser.setRequestedVehicleId(null);
+        userRepository.save(targetUser);
+        
+        return ResponseEntity.ok(Map.of("message", "Đã duyệt yêu cầu gia nhập thành công!"));
+    }
+
+    @PostMapping("/vehicles/{vehicleId}/reject-join/{userId}")
+    @Transactional
+    public ResponseEntity<?> rejectJoinRequest(@PathVariable Long vehicleId, @PathVariable Long userId, HttpServletRequest request) {
+        Long currentUserId = (Long) request.getAttribute("userId");
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        
+        boolean isAdmin = "ADMIN".equals(currentUser.getRole());
+        boolean isLeaderOfThisVehicle = Boolean.TRUE.equals(currentUser.getIsGroupLeader()) 
+                && currentUser.getVehicle() != null 
+                && currentUser.getVehicle().getId().equals(vehicleId);
+                
+        if (!isAdmin && !isLeaderOfThisVehicle) {
+            return ResponseEntity.status(403).body("Bạn không có quyền từ chối yêu cầu gia nhập cho xe này.");
+        }
+        
+        User targetUser = userRepository.findById(userId).orElse(null);
+        if (targetUser == null) {
+            return ResponseEntity.badRequest().body("Không tìm thấy người dùng");
+        }
+        
+        if (!vehicleId.equals(targetUser.getRequestedVehicleId())) {
+            return ResponseEntity.badRequest().body("Người dùng không gửi yêu cầu xin vào xe này");
+        }
+        
+        targetUser.setRequestedVehicleId(null);
+        userRepository.save(targetUser);
+        
+        return ResponseEntity.ok(Map.of("message", "Đã từ chối yêu cầu gia nhập!"));
+    }
+
+    @PostMapping("/users/deposit-wallet")
+    @Transactional
+    public ResponseEntity<?> depositWallet(@RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        
+        Object amountObj = payload.get("amount");
+        if (amountObj == null) {
+            return ResponseEntity.badRequest().body("Thiếu số tiền nạp");
+        }
+        
+        double amount = Double.parseDouble(amountObj.toString());
+        if (amount <= 0) {
+            return ResponseEntity.badRequest().body("Số tiền nạp phải lớn hơn 0");
+        }
+        
+        double currentWallet = user.getWalletBalance() != null ? user.getWalletBalance() : 0.0;
+        user.setWalletBalance(currentWallet + amount);
+        userRepository.save(user);
+        
+        Transaction tx = Transaction.builder()
+                .user(user)
+                .type("DEPOSIT")
+                .categoryName("Nạp ví cá nhân")
+                .amount(amount)
+                .date(java.time.LocalDate.now())
+                .description("Nạp tiền vào ví cá nhân trực tuyến")
+                .status("PAID")
+                .build();
+        transactionRepository.save(tx);
+        
+        return ResponseEntity.ok(Map.of(
+            "message", "Nạp tiền vào ví cá nhân thành công!",
+            "newBalance", user.getWalletBalance()
+        ));
     }
 }
