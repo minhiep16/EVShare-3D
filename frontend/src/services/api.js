@@ -25,6 +25,11 @@ export const createBooking = async (bookingRequest) => {
   return response.data;
 };
 
+export const depositJointFund = async (vehicleId, data) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/deposit`, data);
+  return response.data;
+};
+
 export const uploadFile = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
@@ -108,6 +113,16 @@ export const createServiceRecord = async (recordData) => {
   return response.data;
 };
 
+export const startServiceRecord = async (id) => {
+  const response = await axios.put(`${API_BASE_URL}/admin/services/${id}/start`);
+  return response.data;
+};
+
+export const completeServiceRecord = async (id, actualCost) => {
+  const response = await axios.put(`${API_BASE_URL}/admin/services/${id}/complete`, { actualCost });
+  return response.data;
+};
+
 export const getServiceTemplates = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/services/templates`);
   return response.data;
@@ -120,6 +135,21 @@ export const createServiceTemplate = async (templateData) => {
 
 export const proposeServiceVote = async (vehicleId, data) => {
   const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/votes/propose-service`, data);
+  return response.data;
+};
+
+export const proposeLeaderVote = async (vehicleId, leaderId) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/votes/propose-leader`, { leaderId: leaderId.toString() });
+  return response.data;
+};
+
+export const allocateShares = async (vehicleId, sharesData) => {
+  const response = await axios.put(`${API_BASE_URL}/vehicles/${vehicleId}/allocate-shares`, sharesData);
+  return response.data;
+};
+
+export const requestJoinVehicle = async (vehicleId) => {
+  const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/request-join`);
   return response.data;
 };
 

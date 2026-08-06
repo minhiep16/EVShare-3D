@@ -69,8 +69,9 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
   const groupTransactions = transactions.filter(t => t.type !== 'TRIP_FEE');
   
   const totalCost = useMemo(() => {
-    return groupTransactions.reduce((sum, t) => sum + (t.amount || 0), 0);
-  }, [groupTransactions]);
+    const groupTotalCost = transactions.filter(t => t.type !== 'TRIP_FEE').reduce((sum, t) => sum + t.amount, 0);
+    return groupTotalCost;
+  }, [transactions]);
 
   const userShare = totalCost * (currentUser?.ownershipPercentage || 0) / 100;
   const jointFund = currentUser?.vehicle?.jointFundBalance || 0;

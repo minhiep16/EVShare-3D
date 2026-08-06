@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
+const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCreateVehicle, onAddMemberClick }) => {
   const getFormattedDate = () => {
     const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     const now = new Date();
@@ -178,7 +178,7 @@ const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
           </button>
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Đặt lịch xe</h1>
-            <p className="text-xs text-slate-400 font-medium">Tesla Model 3 · 51G-888.99</p>
+            <p className="text-xs text-slate-400 font-medium">{vehicle ? `${vehicle.model} · ${vehicle.licensePlate}` : 'Chưa có xe'}</p>
           </div>
         </div>
         
@@ -188,15 +188,20 @@ const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-[#22c55e]/40 border border-[#22c55e]"></span>Của bạn
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-blue-100 border border-blue-300"></span>Trần Bình
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-yellow-100 border border-yellow-300"></span>Lê Tuấn
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-slate-200 border border-slate-300"></span>Trống
-            </span>
+            {coOwners && coOwners.filter(o => o.id !== currentUser?.id).map((owner, idx) => {
+              const colors = [
+                { bg: 'bg-blue-100', border: 'border-blue-300' },
+                { bg: 'bg-amber-100', border: 'border-amber-300' },
+                { bg: 'bg-purple-100', border: 'border-purple-300' },
+                { bg: 'bg-pink-100', border: 'border-pink-300' }
+              ];
+              const c = colors[idx % colors.length];
+              return (
+                <span key={owner.id} className="flex items-center gap-1.5">
+                  <span className={`w-3 h-3 rounded ${c.bg} border ${c.border}`}></span>{owner.name || owner.username}
+                </span>
+              );
+            })}
           </div>
           
           <button 
@@ -228,7 +233,7 @@ const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
           </button>
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Nhóm sở hữu</h1>
-            <p className="text-xs text-slate-400 font-medium">Tesla Model 3 – Nhóm #EV-2025-001</p>
+            <p className="text-xs text-slate-400 font-medium">{vehicle ? `${vehicle.model} – Nhóm #EV-2026-${vehicle.id.toString().padStart(3, '0')}` : 'Chưa có nhóm'}</p>
           </div>
         </div>
         
@@ -240,12 +245,14 @@ const Header = ({ currentUser, activeTab, onMenuToggle, onCreateVehicle }) => {
             <i className="ph ph-chat-circle text-slate-500"></i>Nhắn tin nhóm
           </button>
           
-          <button 
-            onClick={() => alert('👤 Mở hộp thoại mời thêm thành viên mới!')}
-            className="inline-flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
-          >
-            <i className="ph ph-user-plus"></i>Thêm thành viên
-          </button>
+          {currentUser?.isGroupLeader && (
+            <button 
+              onClick={onAddMemberClick}
+              className="inline-flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+            >
+              <i className="ph ph-user-plus"></i>Thêm thành viên
+            </button>
+          )}
           
           <img 
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 

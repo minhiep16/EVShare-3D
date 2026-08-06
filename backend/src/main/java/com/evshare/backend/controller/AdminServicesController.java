@@ -11,7 +11,14 @@ import lombok.Data;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
+import com.evshare.backend.repository.FundTransactionRepository;
+import com.evshare.backend.repository.UserRepository;
+import com.evshare.backend.entity.FundTransaction;
+import com.evshare.backend.entity.User;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/admin/services")
@@ -21,6 +28,8 @@ public class AdminServicesController {
     private final ServiceRecordRepository serviceRecordRepository;
     private final ServiceTemplateRepository serviceTemplateRepository;
     private final VehicleRepository vehicleRepository;
+    private final FundTransactionRepository fundTransactionRepository;
+    private final UserRepository userRepository;
 
     @PostMapping("")
     public ResponseEntity<ServiceRecord> createServiceRecord(@RequestBody ServiceRecordRequest request) {
@@ -50,7 +59,11 @@ public class AdminServicesController {
 
     @GetMapping("/pending")
     public ResponseEntity<List<ServiceRecord>> getPendingServices() {
-        return ResponseEntity.ok(serviceRecordRepository.findByStatus("PENDING"));
+        // Also fetch IN_PROGRESS so Admin can see them
+        List<ServiceRecord> pending = serviceRecordRepository.findByStatus("PENDING");
+        List<ServiceRecord> inProgress = serviceRecordRepository.findByStatus("IN_PROGRESS");
+        pending.addAll(inProgress);
+        return ResponseEntity.ok(pending);
     }
 
     @GetMapping("/completed")
@@ -64,8 +77,59 @@ public class AdminServicesController {
     }
 
     @PostMapping("/templates")
-    public ResponseEntity<ServiceTemplate> createServiceTemplate(@RequestBody ServiceTemplate template) {
-        template.setIsActive(true);
-        return ResponseEntity.ok(serviceTemplateRepository.save(template));
+    public ResponseEntity<ServiceTemplate> createTemplate(@RequestBody ServiceTemplate request) {
+        return ResponseEntity.ok(serviceTemplateRepository.save(request));
+    }
+
+    @PutMapping("/{id}/start")
+    public ResponseEntity<?> startService(@PathVariable Long id) {
+        ServiceRecord record = serviceRecordRepository.findById(id).orElse(null);
+        if (record == null) return ResponseEntity.badRequest().body("Service not found");
+        
+        record.setStatus("IN_PROGRESS");
+        serviceRecordRepository.save(record);
+        return ResponseEntity.ok(Map.of("message", "Đã bắt đầu thực hiện dịch vụ!"));
+    }
+
+    @PutMapping("/{id}/complete")
+    @Transactional
+    public ResponseEntity<?> completeService(@PathVariable Long id, @RequestBody Map<String, Double> payload, HttpServletRequest request) {
+        ServiceRecord record = serviceRecordRepository.findById(id).orElse(null);
+        if (record == null) return ResponseEntity.badRequest().body("Service not found");
+        
+        Double actualCost = payload.get("actualCost");
+        if (actualCost == null || actualCost < 0) {
+            return ResponseEntity.badRequest().body("Invalid cost");
+        }
+
+        // Update ServiceRecord
+        record.setStatus("COMPLETED");
+        record.setCost(actualCost);
+        // Note: The original Entity might not have completedDate, we just use scheduledDate or add it.
+        serviceRecordRepository.save(record);
+
+        // Deduct from joint fund
+        Vehicle vehicle = record.getVehicle();
+        if (vehicle != null) {
+            vehicle.setJointFundBalance(vehicle.getJointFundBalance() - actualCost);
+            vehicleRepository.save(vehicle);
+
+            Long userId = (Long) request.getAttribute("userId");
+            User admin = userId != null ? userRepository.findById(userId).orElse(null) : null;
+
+            // Record transaction
+            FundTransaction tx = FundTransaction.builder()
+                    .vehicle(vehicle)
+                    .user(admin)
+                    .type("OUT")
+                    .title("Chi trả: " + record.getServiceType())
+                    .description(record.getDescription())
+                    .amount(-actualCost)
+                    .transactionDate(java.time.LocalDateTime.now())
+                    .build();
+            fundTransactionRepository.save(tx);
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Đã hoàn thành dịch vụ và tự động trừ quỹ chung!"));
     }
 }

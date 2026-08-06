@@ -16,6 +16,7 @@ public class Vote {
     
     private String title;
     private String description;
+    private String type;
     @Builder.Default
     private Double agreedPercentage = 0.0;
     

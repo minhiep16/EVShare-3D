@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingServices, getCompletedServices, createServiceTemplate, getAllVehicles, createServiceRecord } from '../services/api';
+import { getPendingServices, getCompletedServices, createServiceTemplate, getAllVehicles, createServiceRecord, startServiceRecord, completeServiceRecord } from '../services/api';
 
 const AdminServices = () => {
   const [filterCategory, setFilterCategory] = useState('Tất cả');
@@ -17,19 +17,20 @@ const AdminServices = () => {
   const [vehicles, setVehicles] = useState([]);
   const [newRecord, setNewRecord] = useState({ vehicleId: '', serviceType: 'Bảo dưỡng', description: '', cost: '', scheduledDate: '' });
   
-  // Interactive states for card tasks
-  const [service1Status, setService1Status] = useState('Sắp đến hạn');
-  const [truckDispatched, setTruckDispatched] = useState(false);
+  // Service Completion Modal
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completingServiceId, setCompletingServiceId] = useState(null);
+  const [actualCost, setActualCost] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    const fetchServicesAndVehicles = async () => {
-      try {
-        setLoading(true);
-        const [pendingData, completedData, vehiclesData] = await Promise.all([
-          getPendingServices(),
-          getCompletedServices(),
-          getAllVehicles()
-        ]);
+  const fetchServicesAndVehicles = async () => {
+    try {
+      setLoading(true);
+      const [pendingData, completedData, vehiclesData] = await Promise.all([
+        getPendingServices(),
+        getCompletedServices(),
+        getAllVehicles()
+      ]);
         
         setVehicles(vehiclesData || []);
         if (vehiclesData && vehiclesData.length > 0) {
@@ -44,7 +45,7 @@ const AdminServices = () => {
           plate: s.vehicle?.licensePlate || 'Unknown',
           iconClass: s.serviceType === 'Sửa chữa' ? 'ph ph-warning text-red-600 bg-red-50' : 'ph ph-wrench text-blue-600 bg-blue-50',
           status: s.status,
-          statusClass: s.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : 'bg-blue-100 text-blue-700',
+          statusClass: s.status === 'PENDING' ? 'bg-amber-50 text-amber-600' : (s.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'),
           date: s.scheduledDate ? new Date(s.scheduledDate).toLocaleDateString('vi-VN') : 'N/A',
           location: 'Trạm EVShare',
           cost: s.cost || 0,
@@ -62,12 +63,14 @@ const AdminServices = () => {
           staff: 'Hệ thống EVShare'
         }));
         setHistoryLogs(mappedHistory);
-      } catch (err) {
-        console.error("Failed to fetch services", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } catch (err) {
+      console.error("Failed to fetch services", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchServicesAndVehicles();
 
     // Listen for custom event from Header
@@ -88,22 +91,33 @@ const AdminServices = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const handleStartService1 = () => {
-    if (service1Status === 'Đang thực hiện') {
-      alert('⚙️ Dịch vụ bảo dưỡng đã bắt đầu và đang ghi nhận dữ liệu kỹ thuật từ trạm.');
-      return;
+  const handleStartService = async (id) => {
+    try {
+      const res = await startServiceRecord(id);
+      alert('⚙️ ' + res.message);
+      fetchServicesAndVehicles();
+    } catch (err) {
+      alert('Lỗi: ' + (err.response?.data || err.message));
     }
-    setService1Status('Đang thực hiện');
-    alert('🔧 Bắt đầu thực hiện bảo dưỡng xe. Hệ thống đã cập nhật trạng thái hoạt động.');
   };
 
-  const handleDispatchRescue = () => {
-    if (truckDispatched) {
-      alert('🚒 Xe cứu hộ đang trên đường di chuyển đến vị trí xe.');
+  const handleCompleteService = async () => {
+    if (!actualCost || actualCost < 0) {
+      alert('Vui lòng nhập chi phí thực tế hợp lệ!');
       return;
     }
-    setTruckDispatched(true);
-    alert('🚒 Đã điều phối xe cứu hộ chuyên dụng 24/7 đến để kéo xe về trung tâm kỹ thuật.');
+    try {
+      setIsProcessing(true);
+      const res = await completeServiceRecord(completingServiceId, parseFloat(actualCost));
+      alert('✅ ' + res.message);
+      setShowCompleteModal(false);
+      setActualCost('');
+      fetchServicesAndVehicles();
+    } catch (err) {
+      alert('Lỗi: ' + (err.response?.data || err.message));
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleCreateTemplate = async () => {
@@ -389,36 +403,32 @@ const AdminServices = () => {
               <div className={`p-3 flex gap-2 border-t ${
                 isUrgent ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-200'
               }`}>
-                {isUrgent ? (
+                {srv.status === 'PENDING' ? (
                   <>
                     <button 
-                      onClick={() => alert('❌ Đã từ chối sự cố. Chuyển hồ sơ về cho Bảo hiểm làm việc.')}
-                      className="flex-1 py-2 text-xs font-bold text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
-                    >
-                      Từ chối
-                    </button>
-                    <button 
-                      onClick={handleDispatchRescue}
-                      className="flex-1 py-2 text-xs font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
-                    >
-                      {truckDispatched ? 'Đang điều cứu hộ...' : 'Điều xe cứu hộ'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button 
-                      onClick={() => alert('🔍 Xem chi tiết lịch trình bảo dưỡng...')}
+                      onClick={() => alert('Chi tiết lịch trình')}
                       className="flex-1 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       Chi tiết
                     </button>
                     <button 
-                      onClick={handleStartService1}
+                      onClick={() => handleStartService(srv.id)}
                       className="flex-1 py-2 text-xs font-bold text-white bg-brand-500 rounded-lg hover:bg-brand-600 transition-colors cursor-pointer"
                     >
                       Bắt đầu thực hiện
                     </button>
                   </>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      setCompletingServiceId(srv.id);
+                      setActualCost(srv.cost || '');
+                      setShowCompleteModal(true);
+                    }}
+                    className="w-full py-2 text-xs font-bold text-white bg-[#22c55e] rounded-lg hover:bg-[#16a34a] transition-colors cursor-pointer"
+                  >
+                    Hoàn thành & Khấu trừ quỹ
+                  </button>
                 )}
               </div>
             </div>
@@ -432,7 +442,46 @@ const AdminServices = () => {
         )}
       </div>
 
-      {/* Service History Table */}
+      {/* Completion Modal */}
+      {showCompleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-ink text-lg">Hoàn thành Dịch vụ</h3>
+              <button 
+                onClick={() => setShowCompleteModal(false)} 
+                className="text-slate-400 hover:text-slate-600"
+                disabled={isProcessing}
+              >
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600">Vui lòng nhập tổng chi phí thực tế cho dịch vụ này. Hệ thống sẽ tự động trừ số tiền này từ Quỹ chung của xe.</p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chi phí thực tế (VNĐ)</label>
+                <input 
+                  type="number" 
+                  value={actualCost}
+                  onChange={e => setActualCost(e.target.value)}
+                  placeholder="Ví dụ: 1500000"
+                  className="w-full border-slate-200 rounded-lg text-sm p-3 border font-bold text-ink focus:ring-brand-500 focus:border-brand-500"
+                  disabled={isProcessing}
+                />
+              </div>
+              <button 
+                onClick={handleCompleteService}
+                disabled={isProcessing}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold py-3 rounded-lg shadow-sm transition-colors mt-2"
+              >
+                {isProcessing ? 'Đang xử lý...' : 'Hoàn thành & Trừ Quỹ chung'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-base font-bold text-ink">Lịch sử dịch vụ gần đây</h3>

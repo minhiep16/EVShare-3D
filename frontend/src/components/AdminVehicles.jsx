@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleGroups } from '../services/api';
+import { getVehicleGroups, getUnassignedUsers, addMemberToVehicle } from '../services/api';
 
 const AdminVehicles = () => {
   const [vehicleGroups, setVehicleGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+  const [unassignedUsers, setUnassignedUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -183,6 +189,22 @@ const AdminVehicles = () => {
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
                         <button 
+                          onClick={async () => {
+                            setSelectedVehicleId(v.id);
+                            try {
+                              const users = await getUnassignedUsers();
+                              setUnassignedUsers(users);
+                              setShowAddMemberModal(true);
+                            } catch (e) {
+                              alert('Lỗi khi tải danh sách user trống: ' + e.message);
+                            }
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#22c55e]/10 hover:bg-[#22c55e]/20 text-[#16a34a] border border-[#22c55e]/20 flex items-center justify-center font-bold text-xs transition-colors"
+                          title="Thêm thành viên"
+                        >
+                          + Thêm TV
+                        </button>
+                        <button 
                           onClick={() => alert('Đang mở form chỉnh sửa thông tin xe...')}
                           className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 transition-colors"
                           title="Sửa xe"
@@ -218,6 +240,75 @@ const AdminVehicles = () => {
           </table>
         </div>
       </div>
+
+      {/* Add Member Modal */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] p-6 flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#22c55e] shrink-0">
+                <i className="ph-fill ph-user-plus text-2xl"></i>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-ink mb-1">Thêm Thành Viên</h3>
+                <p className="text-sm text-[#16a34a]/80">Gán người dùng vào nhóm xe. Người này sẽ mặc định có 0% cổ phần ban đầu.</p>
+              </div>
+              <button 
+                onClick={() => setShowAddMemberModal(false)}
+                className="w-8 h-8 rounded-full bg-white/50 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center shrink-0"
+              >
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Chọn Người dùng</label>
+                {unassignedUsers.length === 0 ? (
+                  <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200">
+                    Hiện không có người dùng nào trống (chưa vào nhóm xe).
+                  </div>
+                ) : (
+                  <select 
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
+                  >
+                    <option value="">-- Chọn thành viên --</option>
+                    {unassignedUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.username} (ID: {user.id}) {user.requestedVehicleId === selectedVehicleId ? '⭐ Đang xin vào' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              
+              <button 
+                onClick={async () => {
+                  if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
+                  try {
+                    setIsSubmitting(true);
+                    await addMemberToVehicle(selectedVehicleId, selectedUserId, 0); // 0% by default
+                    alert('✅ Đã thêm thành viên thành công!');
+                    setShowAddMemberModal(false);
+                    fetchData(); // reload table
+                  } catch (e) {
+                    alert('Lỗi: ' + (e.response?.data || e.message));
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                disabled={isSubmitting || !selectedUserId}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -75,22 +75,11 @@ public class AdminController {
             return ResponseEntity.badRequest().body("User not found");
         }
 
-        // Calculate current total ownership
-        List<User> currentMembers = userRepository.findAll().stream()
-                .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(vehicleId))
-                .collect(Collectors.toList());
-
-        double currentTotal = currentMembers.stream()
-                .filter(u -> !u.getId().equals(user.getId())) // exclude the user being updated if they are already in the group
-                .mapToDouble(u -> u.getOwnershipPercentage() != null ? u.getOwnershipPercentage() : 0.0)
-                .sum();
-
-        if (currentTotal + request.getOwnershipPercentage() > 100.0) {
-            return ResponseEntity.badRequest().body("Tổng tỷ lệ sở hữu vượt quá 100%. Nhóm xe này chỉ còn trống " + (100.0 - currentTotal) + "%.");
-        }
+        // Admin no longer needs to calculate ownership. Group leader will do it.
+        // ownershipPercentage starts at 0.
 
         user.setVehicle(vehicle);
-        user.setOwnershipPercentage(request.getOwnershipPercentage());
+        user.setOwnershipPercentage(0.0); // Set to 0 initially
         userRepository.save(user);
 
         return ResponseEntity.ok("User added to vehicle successfully");

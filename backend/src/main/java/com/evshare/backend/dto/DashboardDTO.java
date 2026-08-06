@@ -16,6 +16,7 @@ public class DashboardDTO {
     private List<User> coOwners;
     private List<Vote> activeVotes;
     private List<Suggestion> suggestions;
+    private List<Vehicle> availableVehicles;
 
     @Data
     @NoArgsConstructor

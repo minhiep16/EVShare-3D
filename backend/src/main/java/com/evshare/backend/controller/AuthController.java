@@ -78,6 +78,10 @@ public class AuthController {
                         ? "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg" 
                         : "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
                 .ownershipPercentage(0.0)
+                .isGroupLeader(false)
+                .walletBalance(0.0)
+                .status(User.UserStatus.ACTIVE)
+                .version(0)
                 .build();
 
         User saved = userRepository.save(newUser);

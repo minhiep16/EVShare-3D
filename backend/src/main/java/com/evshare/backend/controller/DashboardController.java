@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -89,6 +90,8 @@ public class DashboardController {
                 ? suggestionRepository.findByVehicle_Id(vehicle.getId())
                 : Collections.<com.evshare.backend.entity.Suggestion>emptyList();
 
+        var availableVehicles = isCoOwner ? Collections.<Vehicle>emptyList() : vehicleRepository.findAll();
+
         // Calculate KPI
         double totalCost = 0.0;
         if (isCoOwner && transactions != null) {
@@ -121,9 +124,28 @@ public class DashboardController {
                 .coOwners(coOwners)
                 .activeVotes(activeVotes)
                 .suggestions(suggestions)
+                .availableVehicles(availableVehicles)
                 .build();
 
         return ResponseEntity.ok(dashboard);
+    }
+
+    @PostMapping("/vehicles/{id}/request-join")
+    public ResponseEntity<?> requestJoinVehicle(@PathVariable Long id, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body("User not found");
+        }
+        Vehicle vehicle = vehicleRepository.findById(id).orElse(null);
+        if (vehicle == null) {
+            return ResponseEntity.badRequest().body("Vehicle not found");
+        }
+        
+        user.setRequestedVehicleId(id);
+        userRepository.save(user);
+        
+        return ResponseEntity.ok(Map.of("message", "Đã gửi yêu cầu tham gia nhóm xe!"));
     }
 
     @PostMapping("/bookings")
@@ -193,6 +215,35 @@ public class DashboardController {
         return ResponseEntity.ok(voteRepository.save(vote));
     }
 
+    @PostMapping("/vehicles/{vehicleId}/votes/propose-leader")
+    public ResponseEntity<?> proposeLeaderVote(@PathVariable Long vehicleId, @RequestBody Map<String, String> payload) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId).orElse(null);
+        if (vehicle == null) return ResponseEntity.badRequest().body("Vehicle not found");
+
+        String leaderIdStr = payload.get("leaderId");
+        if (leaderIdStr == null) return ResponseEntity.badRequest().body("Missing leaderId");
+        Long leaderId = Long.parseLong(leaderIdStr);
+
+        User nominee = userRepository.findById(leaderId).orElse(null);
+        if (nominee == null) return ResponseEntity.badRequest().body("Nominee not found");
+
+        int totalMembers = userRepository.countByVehicle_Id(vehicleId);
+
+        Vote vote = Vote.builder()
+                .vehicle(vehicle)
+                .title("Bầu nhóm trưởng: " + leaderId)
+                .description("Đề cử " + (nominee.getName() != null ? nominee.getName() : nominee.getUsername()) + " làm Nhóm trưởng. Nhóm trưởng sẽ có quyền quản lý và chia lại cổ phần cho các thành viên trong xe.")
+                .type("ELECTION")
+                .voterIds(new java.util.HashSet<>())
+                .rejecterIds(new java.util.HashSet<>())
+                .agreedPercentage(0.0)
+                .rejectedPercentage(0.0)
+                .totalPercentage((double) totalMembers)
+                .status("OPEN")
+                .build();
+        return ResponseEntity.ok(voteRepository.save(vote));
+    }
+
     @PostMapping("/votes/{id}/cast")
     @Transactional
     public ResponseEntity<?> castVote(@PathVariable Long id, HttpServletRequest request, @RequestParam(defaultValue = "true") boolean agree) {
@@ -248,6 +299,18 @@ public class DashboardController {
                             .scheduledDate(java.time.LocalDateTime.now().plusDays(3))
                             .build();
                     serviceRecordRepository.save(record);
+                } else if (vote.getTitle().startsWith("Bầu nhóm trưởng: ")) {
+                    Long leaderId = Long.parseLong(vote.getTitle().substring("Bầu nhóm trưởng: ".length()));
+                    
+                    // Reset all members to not leader
+                    List<User> groupMembers = userRepository.findAll().stream()
+                            .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(vote.getVehicle().getId()))
+                            .collect(java.util.stream.Collectors.toList());
+                            
+                    for (User member : groupMembers) {
+                        member.setIsGroupLeader(member.getId().equals(leaderId));
+                        userRepository.save(member);
+                    }
                 }
 
             } else if (vote.getRejectedPercentage() > maxAllowedRejects) {
@@ -309,5 +372,82 @@ public class DashboardController {
     public static class ProposeServiceRequest {
         private Long templateId;
         private String reason;
+    }
+
+    @Data
+    public static class DepositRequest {
+        private Double amount;
+        private String paymentMethod;
+    }
+
+    @PostMapping("/vehicles/{id}/deposit")
+    @Transactional
+    public ResponseEntity<?> depositJointFund(@PathVariable Long id, @RequestBody Map<String, Object> payload, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
+        
+        Vehicle vehicle = vehicleRepository.findById(id).orElse(null);
+        if (vehicle == null) return ResponseEntity.badRequest().body("Vehicle not found");
+
+        Double amount = Double.valueOf(payload.get("amount").toString());
+        String method = (String) payload.get("paymentMethod");
+
+        // Add to vehicle joint fund
+        vehicle.setJointFundBalance(vehicle.getJointFundBalance() + amount);
+        vehicleRepository.save(vehicle);
+
+        // Record transaction
+        FundTransaction tx = FundTransaction.builder()
+                .vehicle(vehicle)
+                .user(user)
+                .type("IN")
+                .title("Nạp quỹ chung")
+                .description("Nạp qua " + method)
+                .amount(amount)
+                .transactionDate(java.time.LocalDateTime.now())
+                .build();
+        fundTransactionRepository.save(tx);
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Nạp quỹ thành công!",
+            "newBalance", vehicle.getJointFundBalance()
+        ));
+    }
+
+    @PutMapping("/vehicles/{id}/allocate-shares")
+    @Transactional
+    public ResponseEntity<?> allocateShares(@PathVariable Long id, @RequestBody Map<String, Double> sharesStr, HttpServletRequest request) {
+        Long currentUserId = (Long) request.getAttribute("userId");
+        User currentUser = userRepository.findById(currentUserId).orElse(null);
+        
+        if (currentUser == null || !Boolean.TRUE.equals(currentUser.getIsGroupLeader()) || currentUser.getVehicle() == null || !currentUser.getVehicle().getId().equals(id)) {
+            return ResponseEntity.badRequest().body("Chỉ Nhóm trưởng mới có quyền chia lại cổ phần.");
+        }
+
+        // Convert String keys to Long (JSON keys are often strings)
+        Map<Long, Double> shares = new java.util.HashMap<>();
+        for (Map.Entry<String, Double> entry : sharesStr.entrySet()) {
+            shares.put(Long.parseLong(entry.getKey()), entry.getValue());
+        }
+
+        // Validate sum == 100
+        double sum = shares.values().stream().mapToDouble(Double::doubleValue).sum();
+        if (Math.abs(sum - 100.0) > 0.01) {
+            return ResponseEntity.badRequest().body("Tổng tỷ lệ cổ phần phải bằng đúng 100%.");
+        }
+
+        List<User> groupMembers = userRepository.findAll().stream()
+                .filter(u -> u.getVehicle() != null && u.getVehicle().getId().equals(id))
+                .collect(java.util.stream.Collectors.toList());
+
+        for (User member : groupMembers) {
+            Double newShare = shares.get(member.getId());
+            if (newShare != null) {
+                member.setOwnershipPercentage(newShare);
+                userRepository.save(member);
+            }
+        }
+
+        return ResponseEntity.ok(Map.of("message", "Đã cập nhật cổ phần thành công!"));
     }
 }

@@ -18,6 +18,9 @@ public class User {
     private String avatarUrl;
     private String role; // "USER" or "ADMIN"
     private Double ownershipPercentage;
+    
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private Boolean isGroupLeader = false;
 
     // Credentials
     private String username;
@@ -38,6 +41,10 @@ public class User {
 
     // Architecture additions
     private Double walletBalance = 0.0;
+    
+    @Column(name = "requested_vehicle_id")
+    private Long requestedVehicleId;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vehicle_id")
     @com.fasterxml.jackson.annotation.JsonIgnore

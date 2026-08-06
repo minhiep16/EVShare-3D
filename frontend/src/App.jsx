@@ -20,7 +20,7 @@ import LoginPage from './components/LoginPage';
 import VehicleCheckin3D from './components/VehicleCheckin3D';
 import AdminVehicles from './components/AdminVehicles';
 import AdminContracts from './components/AdminContracts';
-import { getDashboardData, createBooking, castVote, createVehicle } from './services/api';
+import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -38,6 +38,12 @@ function App() {
   const [isCreateVehicleModalOpen, setIsCreateVehicleModalOpen] = useState(false);
   const [newVehicle, setNewVehicle] = useState({ model: '', licensePlate: '', imageUrl: '' });
   const [creatingVehicle, setCreatingVehicle] = useState(false);
+  
+  // Add Member Modal State (for Group Leader)
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [unassignedUsers, setUnassignedUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchDashboard = async (userId) => {
     try {
@@ -74,7 +80,9 @@ function App() {
 
   const handleVoteClick = async (voteId, agree) => {
     try {
-      await castVote(voteId, agree);
+      if (voteId) {
+        await castVote(voteId, agree);
+      }
       fetchDashboard();
     } catch (err) {
       console.error(err);
@@ -194,7 +202,10 @@ function App() {
   
   const currentUser = {
     ...currentUserBase,
-    vehicle: data?.vehicle
+    vehicle: data?.vehicle,
+    isGroupLeader: userProfile?.isGroupLeader || false,
+    ownershipPercentage: userProfile?.ownershipPercentage || 0,
+    requestedVehicleId: userProfile?.requestedVehicleId || null
   };
   const ownershipPercentage = userProfile?.ownershipPercentage || 40;
 
@@ -269,8 +280,19 @@ function App() {
         <Header 
           currentUser={currentUser} 
           activeTab={activeTab}
+          coOwners={data?.coOwners || []}
+          vehicle={data?.vehicle}
           onMenuToggle={() => setMobileMenuOpen(true)}
           onCreateVehicle={() => setIsCreateVehicleModalOpen(true)}
+          onAddMemberClick={async () => {
+            try {
+              const users = await getUnassignedUsers();
+              setUnassignedUsers(users);
+              setShowAddMemberModal(true);
+            } catch (e) {
+              alert('Lỗi khi tải danh sách user trống: ' + e.message);
+            }
+          }}
         />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
@@ -316,27 +338,61 @@ function App() {
                     </section>
                   </>
                 ) : (
-                  <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
-                    <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounce">
-                      <i className="ph ph-car-profile"></i>
+                  <div className="space-y-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
+                      <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
+                        <i className="ph ph-hourglass-high"></i>
+                      </div>
+                      <h3 className="text-xl font-bold text-ink mb-2">Tài khoản đang chờ xử lý</h3>
+                      <p className="text-sm text-slate-500 max-w-md mx-auto mb-2">
+                        Tài khoản của bạn đã được ghi nhận. Vui lòng chọn một nhóm xe bên dưới để xin tham gia. 
+                        Sau khi được Admin hoặc Nhóm trưởng duyệt, bạn sẽ có quyền truy cập đầy đủ.
+                      </p>
                     </div>
-                    <h3 className="text-xl font-bold text-ink mb-2">Chào mừng thành viên mới!</h3>
-                    <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
-                      Tài khoản của bạn đã được đăng ký thành công trên database. Hiện tại bạn chưa tham gia nhóm đồng sở hữu xe nào trong hệ thống EVShare.
-                    </p>
-                    <div className="flex justify-center gap-3">
-                      <button 
-                        onClick={() => setIsCreateVehicleModalOpen(true)}
-                        className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm font-semibold"
-                      >
-                        Tạo nhóm xe mới
-                      </button>
-                      <button 
-                        onClick={() => alert('📞 Hotline hỗ trợ gia nhập nhóm xe: 1900-xxxx')}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm font-semibold"
-                      >
-                        Liên hệ hỗ trợ
-                      </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {data?.availableVehicles?.map(v => (
+                        <div key={v.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                          <img 
+                            src={v.imageUrl || "https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=400&q=80"} 
+                            alt={v.model}
+                            className="w-full h-32 object-cover rounded-xl mb-4"
+                          />
+                          <h4 className="font-bold text-lg mb-1">{v.model}</h4>
+                          <p className="text-sm text-slate-500 font-medium mb-4">{v.licensePlate} • Nhóm #{v.id}</p>
+                          
+                          <div className="flex gap-2">
+                            <button
+                              disabled={currentUser.requestedVehicleId === v.id || isSubmitting}
+                              onClick={async () => {
+                                try {
+                                  setIsSubmitting(true);
+                                  await requestJoinVehicle(v.id);
+                                  alert('✅ Đã gửi yêu cầu tham gia thành công! Vui lòng chờ phản hồi.');
+                                  fetchDashboard(currentUser.id);
+                                } catch (e) {
+                                  alert('Lỗi: ' + (e.response?.data || e.message));
+                                } finally {
+                                  setIsSubmitting(false);
+                                }
+                              }}
+                              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                                currentUser.requestedVehicleId === v.id 
+                                  ? 'bg-amber-100 text-amber-700 cursor-not-allowed'
+                                  : 'bg-[#22c55e] hover:bg-[#16a34a] text-white cursor-pointer'
+                              }`}
+                            >
+                              {currentUser.requestedVehicleId === v.id ? '⏳ Đang chờ duyệt...' : 'Xin vào nhóm'}
+                            </button>
+                            <button 
+                              onClick={() => alert(`📑 Mở chi tiết hợp đồng cho xe ${v.model}`)}
+                              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+                            >
+                              <i className="ph ph-file-text text-lg"></i>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -545,6 +601,74 @@ function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal (Group Leader) */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] p-6 flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#22c55e] shrink-0">
+                <i className="ph-fill ph-user-plus text-2xl"></i>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-ink mb-1">Thêm Thành Viên</h3>
+                <p className="text-sm text-[#16a34a]/80">Mời người dùng vào nhóm xe. Thành viên mới sẽ có 0% cổ phần ban đầu.</p>
+              </div>
+              <button 
+                onClick={() => setShowAddMemberModal(false)}
+                className="w-8 h-8 rounded-full bg-white/50 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center shrink-0"
+              >
+                <i className="ph ph-x text-lg"></i>
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Chọn Người dùng</label>
+                {unassignedUsers.length === 0 ? (
+                  <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200">
+                    Hiện không có người dùng nào trống.
+                  </div>
+                ) : (
+                  <select 
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
+                  >
+                    <option value="">-- Chọn thành viên --</option>
+                    {unassignedUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.name || user.username} (ID: {user.id}) {user.requestedVehicleId === data?.vehicle?.id ? '⭐ Đang xin vào' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              
+              <button 
+                onClick={async () => {
+                  if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
+                  try {
+                    setIsSubmitting(true);
+                    await addMemberToVehicle(data?.vehicle?.id, selectedUserId, 0); // 0% by default
+                    alert('✅ Đã thêm thành viên thành công!');
+                    setShowAddMemberModal(false);
+                    fetchDashboard(currentUserInfo.id); // reload dashboard
+                  } catch (e) {
+                    alert('Lỗi: ' + (e.response?.data || e.message));
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                disabled={isSubmitting || !selectedUserId}
+                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
+              </button>
+            </div>
           </div>
         </div>
       )}
