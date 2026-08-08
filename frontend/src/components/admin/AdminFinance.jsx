@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getFinanceSummary, getVehicleGroups } from '../services/api';
+import { getFinanceSummary, getVehicleFinanceStats } from '../../services/api';
 
 const AdminFinance = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,21 +14,21 @@ const AdminFinance = () => {
         setLoading(true);
         const [summaryData, groupsData] = await Promise.all([
           getFinanceSummary(),
-          getVehicleGroups()
+          getVehicleFinanceStats()
         ]);
         
         setSummary(summaryData);
         
-        const mappedGroups = groupsData.map(g => ({
-          id: `#EV-2025-${g.vehicle.id.toString().padStart(3, '0')}`,
-          car: g.vehicle.model,
-          plate: g.vehicle.licensePlate,
-          balance: g.vehicle.jointFundBalance || 0,
-          cost: 0, // Should be calculated from transactions in real app
-          charge: '0 kWh', // Mock
-          efficiency: 85, // Mock
-          status: g.vehicle.jointFundBalance > 5000000 ? 'Ổn định' : 'Cảnh báo thấp',
-          badgeClass: g.vehicle.jointFundBalance > 5000000 ? 'bg-brand-50 text-brand-600' : 'bg-amber-50 text-amber-600'
+        const mappedGroups = groupsData.map(v => ({
+          id: `#EV-2025-${v.vehicleId.toString().padStart(3, '0')}`,
+          car: v.model,
+          plate: v.licensePlate,
+          balance: v.balance,
+          cost: v.totalCost,
+          charge: v.charge,
+          efficiency: v.efficiency,
+          status: v.balance > 5000000 ? 'Ổn định' : 'Cảnh báo thấp',
+          badgeClass: v.balance > 5000000 ? 'bg-brand-50 text-brand-600' : 'bg-amber-50 text-amber-600'
         }));
         
         setGroupsFinance(mappedGroups);
@@ -58,34 +58,34 @@ const AdminFinance = () => {
         {/* GMV */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Tổng dòng tiền (GMV)</p>
-          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalIn) : '0₫'}</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.gmv) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
-            <i className="ph ph-trend-up"></i> +12.4% <span className="text-slate-400 font-normal ml-1">với tháng 5</span>
+            <i className="ph ph-trend-up"></i> +12.4% <span className="text-slate-400 font-normal ml-1">với tháng trước</span>
           </div>
         </div>
 
         {/* Revenue */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Phí dịch vụ thu (Revenue)</p>
-          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalIn * 0.1) : '0₫'}</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.systemRevenue) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
-            <i className="ph ph-trend-up"></i> +8.2% <span className="text-slate-400 font-normal ml-1">với tháng 5</span>
+            <i className="ph ph-trend-up"></i> +8.2% <span className="text-slate-400 font-normal ml-1">với tháng trước</span>
           </div>
         </div>
 
         {/* Maintenance cost */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Chi phí bảo trì hệ thống</p>
-          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalOut) : '0₫'}</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.totalCost) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-red-500 font-semibold">
-            <i className="ph ph-trend-up"></i> +4.1% <span className="text-slate-400 font-normal ml-1">do tăng trạm sạc</span>
+            <i className="ph ph-trend-up"></i> +4.1% <span className="text-slate-400 font-normal ml-1">do tăng bảo dưỡng</span>
           </div>
         </div>
 
         {/* Net Profit */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[11px] font-bold text-slate-400 uppercase mb-2 tracking-wide">Lợi nhuận ròng</p>
-          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency((summary.totalIn * 0.1) - summary.totalOut) : '0₫'}</p>
+          <p className="text-2xl font-bold text-ink">{summary ? formatCurrency(summary.netProfit) : '0₫'}</p>
           <div className="mt-2 flex items-center gap-1 text-xs text-brand-600 font-semibold">
             <i className="ph ph-trend-up"></i> +9.8% <span className="text-slate-400 font-normal ml-1">tăng trưởng ổn định</span>
           </div>

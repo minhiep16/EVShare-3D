@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAdminDisputes, solveDispute } from '../services/api';
+import { getAdminDisputes, solveDispute } from '../../services/api';
 
 const AdminDisputes = () => {
   const [activeDisputes, setActiveDisputes] = useState([]);

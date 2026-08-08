@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,6 +26,21 @@ import java.time.LocalDate;
 public class EContractController {
 
     private final UserRepository userRepository;
+
+    @PostMapping("/sign")
+    public ResponseEntity<?> signContract(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userRepository.findById(userId).orElse(null);
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        user.setIsContractSigned(true);
+        userRepository.save(user);
+        
+        return ResponseEntity.ok().build();
+    }
 
     @GetMapping("/download")
     public ResponseEntity<byte[]> downloadContract(HttpServletRequest request) {

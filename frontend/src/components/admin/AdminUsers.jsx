@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPendingApprovalUsers, approveUser, rejectUser } from '../services/api';
+import { getPendingApprovalUsers, approveUser, rejectUser } from '../../services/api';
 
 const AdminUsers = () => {
   const [pendingUsers, setPendingUsers] = useState([]);

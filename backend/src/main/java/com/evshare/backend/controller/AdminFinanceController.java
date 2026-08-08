@@ -19,28 +19,74 @@ public class AdminFinanceController {
 
     private final FundTransactionRepository fundTransactionRepository;
     private final com.evshare.backend.repository.VehicleRepository vehicleRepository;
+    private final com.evshare.backend.repository.TransactionRepository transactionRepository;
 
     @GetMapping("/summary")
     public ResponseEntity<?> getFinanceSummary() {
-        List<FundTransaction> allTransactions = fundTransactionRepository.findAll();
+        List<FundTransaction> fundTransactions = fundTransactionRepository.findAll();
+        List<com.evshare.backend.entity.Transaction> allTransactions = transactionRepository.findAll();
         
-        Double totalIn = allTransactions.stream()
-            .filter(t -> "IN".equals(t.getType()))
-            .mapToDouble(FundTransaction::getAmount)
+        // GMV: Total user deposits or payments in the system
+        Double gmv = allTransactions.stream()
+            .mapToDouble(com.evshare.backend.entity.Transaction::getAmount)
             .sum();
-            
-        Double totalOut = allTransactions.stream()
+
+        // System Revenue (assumed 10% platform fee from GMV)
+        Double systemRevenue = gmv * 0.1;
+
+        // Total Cost: Total fund spent (OUT) across all vehicles
+        Double totalCost = fundTransactions.stream()
             .filter(t -> "OUT".equals(t.getType()))
             .mapToDouble(FundTransaction::getAmount)
             .sum();
 
+        // Total In: Total fund collected across all vehicles
+        Double totalIn = fundTransactions.stream()
+            .filter(t -> "IN".equals(t.getType()))
+            .mapToDouble(FundTransaction::getAmount)
+            .sum();
+
         Map<String, Object> summary = new HashMap<>();
-        summary.put("totalFundBalance", totalIn - totalOut);
-        summary.put("totalIn", totalIn);
-        summary.put("totalOut", totalOut);
-        summary.put("recentTransactions", allTransactions.stream().limit(10).toList());
+        summary.put("totalFundBalance", totalIn - totalCost);
+        summary.put("gmv", gmv);
+        summary.put("systemRevenue", systemRevenue);
+        summary.put("totalCost", totalCost);
+        summary.put("netProfit", systemRevenue - totalCost);
+        summary.put("recentTransactions", fundTransactions.stream().limit(10).toList());
 
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/vehicles")
+    public ResponseEntity<?> getVehicleFinanceStats() {
+        List<com.evshare.backend.entity.Vehicle> allVehicles = vehicleRepository.findAll();
+        List<FundTransaction> fundTransactions = fundTransactionRepository.findAll();
+
+        List<Map<String, Object>> result = allVehicles.stream().map(v -> {
+            Double totalCost = fundTransactions.stream()
+                .filter(t -> "OUT".equals(t.getType()) && t.getVehicle() != null && t.getVehicle().getId().equals(v.getId()))
+                .mapToDouble(FundTransaction::getAmount)
+                .sum();
+            
+            Double totalIn = fundTransactions.stream()
+                .filter(t -> "IN".equals(t.getType()) && t.getVehicle() != null && t.getVehicle().getId().equals(v.getId()))
+                .mapToDouble(FundTransaction::getAmount)
+                .sum();
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("vehicleId", v.getId());
+            map.put("model", v.getModel());
+            map.put("licensePlate", v.getLicensePlate());
+            map.put("balance", v.getJointFundBalance() != null ? v.getJointFundBalance() : 0.0);
+            map.put("totalCost", totalCost);
+            map.put("totalIn", totalIn);
+            // Charge could be mocked or calculated from odometer
+            map.put("charge", (v.getOdometer() != null ? v.getOdometer() * 0.15 : 0) + " kWh"); 
+            map.put("efficiency", 85 + (int)(Math.random() * 10)); // Slight random mock for efficiency
+            return map;
+        }).toList();
+
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/analytics/revenue")

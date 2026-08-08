@@ -139,6 +139,16 @@ export const createServiceRecord = async (recordData) => {
   return response.data;
 };
 
+export const updateServiceRecord = async (id, data) => {
+  const response = await axios.put(`${API_BASE_URL}/admin/services/${id}`, data);
+  return response.data;
+};
+
+export const deleteServiceRecord = async (id) => {
+  const response = await axios.delete(`${API_BASE_URL}/admin/services/${id}`);
+  return response.data;
+};
+
 export const startServiceRecord = async (id) => {
   const response = await axios.put(`${API_BASE_URL}/admin/services/${id}/start`);
   return response.data;
@@ -244,6 +254,38 @@ export const getUserCheckinLogs = async () => {
 export const getMyTransactions = async () => {
   const token = localStorage.getItem('evshare_jwt_token');
   const response = await axios.get(`${API_BASE_URL}/transactions/my-history`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getVehicleFinanceStats = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.get(`${API_BASE_URL}/admin/finance/vehicles`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getNotifications = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.get(`${API_BASE_URL}/notifications`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const markNotificationRead = async (id) => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.post(`${API_BASE_URL}/notifications/${id}/read`, {}, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const signContract = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.post(`${API_BASE_URL}/contracts/sign`, {}, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;

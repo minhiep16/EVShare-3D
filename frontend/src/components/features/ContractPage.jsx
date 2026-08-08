@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { downloadContract } from '../services/api';
+import { downloadContract, signContract } from '../../services/api';
 
 const ContractPage = ({ currentUser, vehicle, coOwners }) => {
   const currentVehicle = vehicle || { id: 1, model: 'Chưa có xe', licensePlate: 'N/A' };
   const members = coOwners?.length > 0 ? coOwners : [];
-  const storageKey = `appendixSigned_${currentUser?.id || 'guest'}`;
-  const [appendixSigned, setAppendixSigned] = useState(() => {
-    return localStorage.getItem(storageKey) === 'true';
-  });
+  
+  const isMember = members.some(m => m.id?.toString() === currentUser?.id?.toString());
+  
+  const [appendixSigned, setAppendixSigned] = useState(currentUser?.isContractSigned || false);
 
   React.useEffect(() => {
-    setAppendixSigned(localStorage.getItem(storageKey) === 'true');
-  }, [storageKey]);
+    setAppendixSigned(currentUser?.isContractSigned || false);
+  }, [currentUser]);
 
   const [showViewer, setShowViewer] = useState(false);
 
@@ -26,16 +26,25 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
   const pastContractId = `EVC-${currentYear - 2}-005`;
   const pastContractPeriod = `01/01/${currentYear - 2} – 31/12/${currentYear - 1}`;
 
-  const handleSignAppendix = () => {
+  const handleSignAppendix = async () => {
+    if (!isMember) {
+      alert('Bạn không phải là thành viên của hợp đồng này nên không thể ký!');
+      return;
+    }
     if (appendixSigned) {
       alert('Phụ lục A1 đã được bạn ký điện tử thành công trước đó!');
       return;
     }
     const pin = prompt('Vui lòng nhập mã PIN ký số (mặc định: 1234):');
     if (pin === '1234') {
-      setAppendixSigned(true);
-      localStorage.setItem(storageKey, 'true');
-      alert('🎉 Ký số thành công! Phụ lục HĐ đã chuyển trạng thái sang "Đang chờ thành viên tiếp theo".');
+      try {
+        await signContract();
+        setAppendixSigned(true);
+        alert('🎉 Ký số thành công! Phụ lục HĐ đã chuyển trạng thái sang "Đang chờ thành viên tiếp theo".');
+      } catch (err) {
+        console.error(err);
+        alert('❌ Có lỗi xảy ra khi ký hợp đồng!');
+      }
     } else if (pin !== null) {
       alert('❌ Mã PIN không đúng. Giao dịch ký số bị từ chối.');
     }
@@ -187,7 +196,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                     <i className="ph ph-eye mr-1"></i>Xem
                   </button>
                   
-                  {!appendixSigned && (
+                  {!appendixSigned && isMember && (
                     <button 
                       onClick={handleSignAppendix}
                       className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-white px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"

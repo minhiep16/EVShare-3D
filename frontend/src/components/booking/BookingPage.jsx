@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { createBooking, createDispute } from '../services/api';
+import { createBooking, createDispute } from '../../services/api';
 
 const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -42,21 +42,23 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
 
   const getDayStatus = (d) => {
     const dayBookings = getDayBookings(d);
-    if (dayBookings.length === 0) return "free";
-    
-    const myBooking = dayBookings.find(b => b.user?.id === currentUser?.id);
-    if (myBooking) return "mine";
-    
-    const otherBooking = dayBookings[0];
-    const userIndex = coOwners.findIndex(c => c.id === otherBooking.user?.id);
-    return userIndex === 1 ? "other1" : "other2";
+    if (dayBookings.length === 0) return null;
+    return dayBookings[0].user; // Just return the user who booked it first
   };
 
-  const getDayDotColor = (status) => {
-    if (status === "other1") return "bg-blue-400";
-    if (status === "other2") return "bg-yellow-400";
-    if (status === "mine") return "bg-[#22c55e]";
-    return null;
+  const getDayDotColor = (user) => {
+    if (!user) return null;
+    if (user.id === currentUser?.id) return "bg-[#22c55e]";
+    const id = user.id || 0;
+    const colors = [
+      "bg-blue-400", 
+      "bg-yellow-400", 
+      "bg-purple-400", 
+      "bg-pink-400", 
+      "bg-orange-400", 
+      "bg-teal-400"
+    ];
+    return colors[id % colors.length];
   };
 
   const selectDay = (d) => {
@@ -226,10 +228,17 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
               if (isSelected) {
                 cellClass += "selected bg-[#22c55e] border-[#22c55e] text-white ";
               } else {
-                if (status === "mine") cellClass += "border-[#22c55e] bg-[#ecfdf5] text-[#16a34a] ";
-                else if (status === "other1") cellClass += "border-blue-400 bg-blue-50 text-blue-600 ";
-                else if (status === "other2") cellClass += "border-yellow-400 bg-yellow-50 text-yellow-600 ";
-                else cellClass += "border-slate-100 hover:bg-slate-50 ";
+                if (status && status.id === currentUser?.id) {
+                  cellClass += "border-[#22c55e] bg-[#ecfdf5] text-[#16a34a] ";
+                } else if (status) {
+                  const id = status.id || 0;
+                  const bgColors = ["bg-blue-50", "bg-yellow-50", "bg-purple-50", "bg-pink-50", "bg-orange-50", "bg-teal-50"];
+                  const textColors = ["text-blue-600", "text-yellow-600", "text-purple-600", "text-pink-600", "text-orange-600", "text-teal-600"];
+                  const borderColors = ["border-blue-400", "border-yellow-400", "border-purple-400", "border-pink-400", "border-orange-400", "border-teal-400"];
+                  cellClass += `${borderColors[id % borderColors.length]} ${bgColors[id % bgColors.length]} ${textColors[id % textColors.length]} `;
+                } else {
+                  cellClass += "border-slate-100 hover:bg-slate-50 ";
+                }
               }
 
               return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { uploadFile, updateProfile } from '../services/api';
+import { uploadFile, updateProfile } from '../../services/api';
 
 const ProfileModal = ({ isOpen, onClose, currentUser, onProfileUpdated }) => {
   const [uploading, setUploading] = useState(false);

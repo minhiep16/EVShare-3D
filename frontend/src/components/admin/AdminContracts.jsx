@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleGroups, downloadContract } from '../services/api';
+import { getVehicleGroups, downloadContract } from '../../services/api';
 
 const AdminContracts = () => {
   const [contracts, setContracts] = useState([]);
@@ -21,8 +21,13 @@ const AdminContracts = () => {
       const mappedContracts = groups.map(group => {
         const v = group.vehicle;
         const members = group.members || [];
-        const isFullySigned = members.length >= 3; // Mock logic: assume 3 is full, or just checking > 0
-        const isExpired = v.status === 'BROKEN'; // Mock logic for expired
+        const totalMembers = members.length;
+        const signedMembers = members.filter(m => m.isContractSigned).length;
+        
+        const isFullySigned = totalMembers > 0 && signedMembers === totalMembers;
+        const isExpired = v.status === 'BROKEN';
+        
+        const progress = totalMembers > 0 ? Math.round((signedMembers / totalMembers) * 100) : 0;
 
         return {
           id: `EVC-${currentYear}-${v.id.toString().padStart(3, '0')}`,
@@ -30,8 +35,8 @@ const AdminContracts = () => {
           members: members,
           startDate: `01/01/${currentYear}`,
           endDate: `01/01/${currentYear + 2}`,
-          status: isExpired ? 'EXPIRED' : (members.length > 0 ? 'ACTIVE' : 'PENDING'),
-          progress: members.length > 0 ? (members.length >= 3 ? 100 : 66) : 0,
+          status: isExpired ? 'EXPIRED' : (isFullySigned ? 'ACTIVE' : 'PENDING'),
+          progress: progress,
         };
       });
       setContracts(mappedContracts);

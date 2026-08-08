@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMyTransactions } from '../services/api';
+import { getMyTransactions } from '../../services/api';
 
 const TransactionLedger = ({ refreshKey }) => {
   const [transactions, setTransactions] = useState([]);

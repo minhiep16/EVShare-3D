@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleGroups, getUnassignedUsers, addMemberToVehicle, approveJoinRequest, rejectJoinRequest } from '../services/api';
+import { getVehicleGroups, getUnassignedUsers, addMemberToVehicle, approveJoinRequest, rejectJoinRequest } from '../../services/api';
 
 const AdminVehicles = () => {
   const [vehicleGroups, setVehicleGroups] = useState([]);

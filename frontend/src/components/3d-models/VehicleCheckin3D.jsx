@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Box, Environment, ContactShadows, Text, Html, useProgress } from '@react-three/drei';
-import { getVehicleGroups, checkoutVehicle, checkinVehicle, getAdminCheckinLogs } from '../services/api';
+import { getVehicleGroups, checkoutVehicle, checkinVehicle, getAdminCheckinLogs } from '../../services/api';
 
 const Loader = () => {
   const { progress } = useProgress();

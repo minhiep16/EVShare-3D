@@ -1,28 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import VehicleHero from './components/VehicleHero';
-import KPICards from './components/KPICards';
-import BookingCalendar from './components/BookingCalendar';
-import CostChart from './components/CostChart';
-import CoOwners from './components/CoOwners';
-import AISuggestions from './components/AISuggestions';
-import BookingPage from './components/BookingPage';
-import CostPage from './components/CostPage';
-import GroupPage from './components/GroupPage';
-import HistoryPage from './components/HistoryPage';
-import ContractPage from './components/ContractPage';
-import AdminDashboard from './components/AdminDashboard';
-import AdminDisputes from './components/AdminDisputes';
-import AdminFinance from './components/AdminFinance';
-import AdminServices from './components/AdminServices';
-import LoginPage from './components/LoginPage';
-import VehicleCheckin3D from './components/VehicleCheckin3D';
-import AdminVehicles from './components/AdminVehicles';
-import AdminContracts from './components/AdminContracts';
-import AdminUsers from './components/AdminUsers';
-import TransactionLedger from './components/TransactionLedger';
-import ProfileModal from './components/ProfileModal';
+import Sidebar from './components/shared/Sidebar';
+import Header from './components/shared/Header';
+import ProfileModal from './components/shared/ProfileModal';
+import VehicleHero from './components/dashboard/VehicleHero';
+import KPICards from './components/dashboard/KPICards';
+import CostChart from './components/dashboard/CostChart';
+import CoOwners from './components/dashboard/CoOwners';
+import AISuggestions from './components/dashboard/AISuggestions';
+import ActiveTripBanner from './components/dashboard/ActiveTripBanner';
+import BookingCalendar from './components/booking/BookingCalendar';
+import BookingPage from './components/booking/BookingPage';
+import NotificationsTab from './components/features/NotificationsTab';
+import CostPage from './components/features/CostPage';
+import GroupPage from './components/features/GroupPage';
+import HistoryPage from './components/features/HistoryPage';
+import ContractPage from './components/features/ContractPage';
+import TransactionLedger from './components/features/TransactionLedger';
+import AdminDashboard from './components/admin/AdminDashboard';
+import AdminDisputes from './components/admin/AdminDisputes';
+import AdminFinance from './components/admin/AdminFinance';
+import AdminServices from './components/admin/AdminServices';
+import AdminVehicles from './components/admin/AdminVehicles';
+import AdminContracts from './components/admin/AdminContracts';
+import AdminUsers from './components/admin/AdminUsers';
+import LoginPage from './components/auth/LoginPage';
+import VehicleCheckin3D from './components/3d-models/VehicleCheckin3D';
 import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle, approveJoinRequest, rejectJoinRequest, depositWallet } from './services/api';
 
 function App() {
@@ -465,19 +467,7 @@ function App() {
             )}
 
             {['notifications'].includes(activeTab) && (
-              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
-                <div className="w-16 h-16 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                  <i className="ph ph-folder-open"></i>
-                </div>
-                <h3 className="text-lg font-bold text-ink mb-1">Chức năng đang được cập nhật</h3>
-                <p className="text-sm text-slate-500 mb-6">Trang này đang được phát triển trong phiên bản tiếp theo.</p>
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm"
-                >
-                  Quay lại Dashboard
-                </button>
-              </div>
+              <NotificationsTab />
             )}
 
           </div>

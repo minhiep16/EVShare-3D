@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVehicleTransactions, getServiceTemplates, proposeServiceVote, depositJointFund, proposeLeaderVote, allocateShares } from '../services/api';
+import { getVehicleTransactions, getServiceTemplates, proposeServiceVote, depositJointFund, proposeLeaderVote, allocateShares } from '../../services/api';
 
 const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSuccess }) => {
   const [fundHistory, setFundHistory] = useState([]);
@@ -267,7 +267,11 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
               return (
                 <div key={m.id} className={`${bgColors[idx % 3]} rounded-xl p-3 text-center`}>
                   <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-                  <p className="text-xs font-medium text-slate-600 mb-1">{(m.name || m.username || `Thành viên ${m.id}`).split(' ').pop()}</p>
+                  {(() => {
+                    const displayName = m.name || m.username;
+                    const shortName = displayName ? displayName.trim().split(' ').pop() : `TV ${m.id}`;
+                    return <p className="text-xs font-medium text-slate-600 mb-1" title={displayName}>{shortName}</p>;
+                  })()}
                   <p className={`text-sm font-bold ${textColors[idx % 3]}`}>{formatCurrency(fundBalance * (m.ownershipPercentage/100))}</p>
                   <p className="text-[10px] text-slate-400">{m.ownershipPercentage}%</p>
                 </div>

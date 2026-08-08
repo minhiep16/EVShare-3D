@@ -43,6 +43,8 @@ public class User {
     // Architecture additions
     private Double walletBalance = 0.0;
     
+    private Boolean isContractSigned = false;
+    
     @Column(name = "requested_vehicle_id")
     private Long requestedVehicleId;
     

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { login as apiLogin, register as apiRegister, uploadFile, simulateOcr } from '../services/api';
+import { login as apiLogin, register as apiRegister, uploadFile, simulateOcr } from '../../services/api';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const [activeForm, setActiveForm] = useState('login'); // login, register

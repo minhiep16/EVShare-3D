@@ -1,5 +1,5 @@
 import React from 'react';
-import Vehicle3D from './Vehicle3D';
+import Vehicle3D from '../3d-models/Vehicle3D';
 
 const VehicleHero = ({ vehicle, coOwnersCount, coOwners, ownershipPercentage, onBookNow }) => {
   if (!vehicle) return null;

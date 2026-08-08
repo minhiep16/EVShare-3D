@@ -1,30 +1,42 @@
 import React from 'react';
 
 const BookingCalendar = ({ bookings, onSelectAll }) => {
-  // Calendar days to show (June 9 to 16 as in mockup, but we can make it a full grid)
-  const displayDays = [9, 10, 11, 12, 13, 14, 15, 16];
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const startOffset = (firstDay === 0 ? 6 : firstDay - 1);
+
+  const displayDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const paddingDays = Array.from({ length: startOffset }, (_, i) => i);
 
   const getBookingForDay = (day) => {
     return bookings.find(b => {
       const dt = new Date(b.startTime);
-      return dt.getDate() === day && dt.getMonth() === 5 && dt.getFullYear() === 2025; // June 2025
+      return dt.getDate() === day && dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
     });
   };
 
-  const getSkinClass = (userName) => {
-    if (!userName) return 'bg-slate-100 text-slate-500';
-    if (userName.includes('Mai')) return 'bg-brand-500 text-white ring-1 ring-brand-500/30';
-    if (userName.includes('Bình')) return 'bg-blue-500 text-white';
-    if (userName.includes('Tuấn')) return 'bg-amber-400 text-white';
-    return 'bg-brand-500 text-white';
+  const getSkinClass = (user) => {
+    if (!user) return 'bg-slate-100 text-slate-500';
+    const id = user.id || 0;
+    const colors = [
+      'bg-brand-500 text-white', 
+      'bg-blue-500 text-white', 
+      'bg-amber-500 text-white', 
+      'bg-indigo-500 text-white', 
+      'bg-[#22c55e] text-white', 
+      'bg-purple-500 text-white'
+    ];
+    return colors[id % colors.length];
   };
 
-  const getDisplayName = (userName) => {
-    if (!userName) return '';
-    if (userName.includes('Mai')) return 'Mai';
-    if (userName.includes('Bình')) return 'Binh';
-    if (userName.includes('Tuấn')) return 'Tuan';
-    return userName;
+  const getDisplayName = (user) => {
+    if (!user) return '';
+    const name = user.name || user.username || `TV ${user.id || ''}`;
+    return name.trim().split(' ').pop();
   };
 
   const formatBookingTime = (booking) => {
@@ -74,20 +86,22 @@ const BookingCalendar = ({ bookings, onSelectAll }) => {
       
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-1.5">
+        {paddingDays.map(k => <div key={`pad-${k}`}></div>)}
         {displayDays.map((day) => {
           const booking = getBookingForDay(day);
-          const userName = booking?.user?.name || booking?.user?.username;
-          const skin = getSkinClass(userName);
-          const name = getDisplayName(userName);
+          const user = booking?.user;
+          const skin = getSkinClass(user);
+          const name = getDisplayName(user);
 
           return (
             <div 
               key={day}
-              className={`cal-cell aspect-square rounded-xl ${skin} flex flex-col items-center justify-center cursor-pointer`}
+              className={`cal-cell rounded-xl ${skin} flex flex-col items-center justify-center cursor-pointer py-1.5`}
+              title={booking ? `${user?.name || user?.username}: ${booking.purpose}` : ''}
             >
               <span className="text-sm font-semibold">{day}</span>
               {name && (
-                <span className="text-[9px] opacity-90 font-medium">{name}</span>
+                <span className="text-[9px] opacity-90 font-medium px-1 truncate w-full text-center">{name}</span>
               )}
             </div>
           );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserCheckinLogs } from '../services/api';
+import { getUserCheckinLogs } from '../../services/api';
 
 const HistoryPage = ({ currentUser, bookings }) => {
   const [searchQuery, setSearchQuery] = useState('');

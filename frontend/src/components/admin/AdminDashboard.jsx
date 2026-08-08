@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups, getAdminDisputes, getFinanceSummary, getPendingServices, solveDispute, getRevenueAnalytics, getVehicleAnalytics } from '../services/api';
+import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups, getAdminDisputes, getFinanceSummary, getPendingServices, solveDispute, getRevenueAnalytics, getVehicleAnalytics } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const AdminDashboard = () => {

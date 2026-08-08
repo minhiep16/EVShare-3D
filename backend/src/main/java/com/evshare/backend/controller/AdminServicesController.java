@@ -84,6 +84,34 @@ public class AdminServicesController {
         return ResponseEntity.ok(serviceTemplateRepository.save(request));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateServiceRecord(@PathVariable Long id, @RequestBody ServiceRecordRequest request) {
+        ServiceRecord record = serviceRecordRepository.findById(id).orElse(null);
+        if (record == null) return ResponseEntity.badRequest().body("Service not found");
+        
+        record.setServiceType(request.getServiceType());
+        record.setDescription(request.getDescription());
+        record.setCost(request.getCost());
+        record.setScheduledDate(request.getScheduledDate());
+        
+        if (request.getVehicleId() != null && !request.getVehicleId().equals(record.getVehicle().getId())) {
+            Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+                .orElseThrow(() -> new RuntimeException("Vehicle not found"));
+            record.setVehicle(vehicle);
+        }
+
+        return ResponseEntity.ok(serviceRecordRepository.save(record));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteServiceRecord(@PathVariable Long id) {
+        ServiceRecord record = serviceRecordRepository.findById(id).orElse(null);
+        if (record == null) return ResponseEntity.badRequest().body("Service not found");
+        
+        serviceRecordRepository.delete(record);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa dịch vụ!"));
+    }
+
     @PutMapping("/{id}/start")
     public ResponseEntity<?> startService(@PathVariable Long id) {
         ServiceRecord record = serviceRecordRepository.findById(id).orElse(null);
