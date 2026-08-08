@@ -518,7 +518,7 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
                     <img src={owner.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full object-cover" />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-ink">{owner.name}</span>
+                        <span className="font-medium text-ink">{owner.name || owner.username || `Thành viên ${owner.id}`}</span>
                         <span className={`font-semibold ${owesThisTx ? 'text-amber-600' : 'text-[#16a34a]'}`}>
                           {formatCurrency(ownerShare)}
                         </span>

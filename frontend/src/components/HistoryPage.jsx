@@ -164,6 +164,7 @@ const HistoryPage = ({ currentUser, bookings }) => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-slate-400">
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Người dùng</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Thời gian</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Xe</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Loại</th>
@@ -182,8 +183,9 @@ const HistoryPage = ({ currentUser, bookings }) => {
                 
                 return (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-3 whitespace-nowrap font-semibold text-ink">{t.userName || "Hệ thống"}</td>
                   <td className="py-3 px-3 text-slate-500 whitespace-nowrap">{new Date(t.timestamp).toLocaleString('vi-VN')}</td>
-                  <td className="py-3 px-3 whitespace-nowrap font-bold text-ink">{t.vehicle?.licensePlate}</td>
+                  <td className="py-3 px-3 whitespace-nowrap font-bold text-ink">{t.vehiclePlate ? `${t.vehicleModel || 'Xe'} - ${t.vehiclePlate}` : (t.vehicle?.licensePlate || t.vehicle?.model || "Xe mặc định")}</td>
                   <td className="py-3 px-3">
                     <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase w-fit ${t.type === 'CHECKIN' ? 'bg-brand-50 text-brand-600' : 'bg-blue-50 text-blue-600'}`}>
                       <i className={t.type === 'CHECKIN' ? 'ph ph-sign-in' : 'ph ph-sign-out'}></i>
@@ -209,7 +211,7 @@ const HistoryPage = ({ currentUser, bookings }) => {
 
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="py-8 text-center text-slate-400">Chưa có lịch sử giao nhận xe nào</td>
+                  <td colSpan="7" className="py-8 text-center text-slate-400">Chưa có lịch sử giao nhận xe nào</td>
                 </tr>
               )}
             </tbody>

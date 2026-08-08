@@ -88,7 +88,7 @@ public class AuthController {
                 .gplxImageUrl(request.getGplxImageUrl())
                 .password(request.getPassword())
                 .role("USER") // Hardcoded security role
-                .avatarUrl("https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
+                .avatarUrl(request.getCccdImageUrl() != null && !request.getCccdImageUrl().trim().isEmpty() ? request.getCccdImageUrl() : "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg")
                 .ownershipPercentage(0.0)
                 .isGroupLeader(false)
                 .walletBalance(0.0)

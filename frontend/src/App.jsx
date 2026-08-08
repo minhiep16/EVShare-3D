@@ -22,6 +22,7 @@ import AdminVehicles from './components/AdminVehicles';
 import AdminContracts from './components/AdminContracts';
 import AdminUsers from './components/AdminUsers';
 import TransactionLedger from './components/TransactionLedger';
+import ProfileModal from './components/ProfileModal';
 import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle, approveJoinRequest, rejectJoinRequest, depositWallet } from './services/api';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('evshare_isAuthenticated') === 'true');
 
   const [isCreateVehicleModalOpen, setIsCreateVehicleModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [newVehicle, setNewVehicle] = useState({ model: '', licensePlate: '', imageUrl: '' });
   const [creatingVehicle, setCreatingVehicle] = useState(false);
 
@@ -294,12 +296,13 @@ function App() {
       )}
 
       {/* Main content body */}
-      <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+      <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden relative">
         <Header
           currentUser={currentUser}
           activeTab={activeTab}
           onMenuToggle={() => setMobileMenuOpen(true)}
           onCreateVehicle={() => setIsCreateVehicleModalOpen(true)}
+          onProfileClick={() => setIsProfileModalOpen(true)}
         />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
@@ -445,7 +448,7 @@ function App() {
               <AdminUsers />
             )}
 
-            {['admin_checkin', 'admin_staff'].includes(activeTab) && (
+            {['admin_staff'].includes(activeTab) && (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
                 <div className="w-16 h-16 bg-violet-50 text-violet-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
                   <i className="ph ph-squares-four text-violet-600"></i>
@@ -663,6 +666,18 @@ function App() {
           </div>
         </div>
       )}
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onProfileUpdated={(newAvatarUrl) => {
+          if (currentUserInfo) {
+            setCurrentUserInfo({ ...currentUserInfo, avatarUrl: newAvatarUrl });
+            localStorage.setItem('evshare_currentUserInfo', JSON.stringify({ ...currentUserInfo, avatarUrl: newAvatarUrl }));
+          }
+        }}
+      />
     </div>
   );
 }

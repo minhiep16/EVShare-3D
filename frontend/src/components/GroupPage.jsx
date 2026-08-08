@@ -267,7 +267,7 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
               return (
                 <div key={m.id} className={`${bgColors[idx % 3]} rounded-xl p-3 text-center`}>
                   <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full mx-auto mb-2 object-cover" />
-                  <p className="text-xs font-medium text-slate-600 mb-1">{(m.name || m.username).split(' ').pop()}</p>
+                  <p className="text-xs font-medium text-slate-600 mb-1">{(m.name || m.username || `Thành viên ${m.id}`).split(' ').pop()}</p>
                   <p className={`text-sm font-bold ${textColors[idx % 3]}`}>{formatCurrency(fundBalance * (m.ownershipPercentage/100))}</p>
                   <p className="text-[10px] text-slate-400">{m.ownershipPercentage}%</p>
                 </div>
@@ -652,7 +652,7 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
                       className="w-10 h-10 rounded-full object-cover"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-ink">{owner.name}</p>
+                      <p className="text-sm font-bold text-ink">{owner.name || owner.username || `Thành viên ${owner.id}`}</p>
                       <p className="text-xs text-slate-500">Tỷ lệ: {owner.ownershipPercentage || 0}%</p>
                     </div>
                     <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${
@@ -715,7 +715,7 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
                       className="w-10 h-10 rounded-full object-cover shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-ink truncate">{owner.name}</p>
+                      <p className="text-sm font-bold text-ink truncate">{owner.name || owner.username || `Thành viên ${owner.id}`}</p>
                       {owner.isGroupLeader && <span className="text-[10px] text-amber-600 font-semibold bg-amber-100 px-2 py-0.5 rounded-full">Nhóm trưởng</span>}
                     </div>
                     <div className="w-32 flex items-center gap-2">

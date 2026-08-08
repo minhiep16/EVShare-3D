@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCreateVehicle, onAddMemberClick }) => {
+const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCreateVehicle, onAddMemberClick, onProfileClick }) => {
   const getFormattedDate = () => {
     const days = ['Chủ Nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
     const now = new Date();
@@ -160,6 +160,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg"} 
             alt={currentUser?.name || "Admin"} 
             className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+            onClick={onProfileClick}
           />
         </div>
       </header>
@@ -215,6 +216,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
             alt={currentUser?.name || "User"} 
             className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+            onClick={onProfileClick}
           />
         </div>
       </header>
@@ -258,6 +260,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
             alt={currentUser?.name || "User"} 
             className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+            onClick={onProfileClick}
           />
         </div>
       </header>
@@ -299,6 +302,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
             alt={currentUser?.name || "User"} 
             className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+            onClick={onProfileClick}
           />
         </div>
       </header>
@@ -333,6 +337,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
             alt={currentUser?.name || "User"} 
             className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+            onClick={onProfileClick}
           />
         </div>
       </header>
@@ -379,6 +384,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
           src={currentUser?.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} 
           alt={currentUser?.name || "User"} 
           className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200 cursor-pointer"
+          onClick={onProfileClick}
         />
       </div>
     </header>

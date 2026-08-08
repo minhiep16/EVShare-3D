@@ -100,7 +100,8 @@ const LoginPage = ({ onLoginSuccess }) => {
       cccdBackImageUrl: registerForm.cccdBackImageUrl,
       gplxImageUrl: registerForm.gplxImageUrl,
       password: registerForm.password,
-      role: 'USER'
+      role: 'USER',
+      avatarUrl: registerForm.cccdImageUrl
     };
 
     try {

@@ -30,6 +30,16 @@ public class CheckinLog {
         return vehicle != null ? vehicle.getId() : null;
     }
 
+    @com.fasterxml.jackson.annotation.JsonProperty("vehiclePlate")
+    public String getVehiclePlate() {
+        return vehicle != null ? vehicle.getLicensePlate() : null;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("vehicleModel")
+    public String getVehicleModel() {
+        return vehicle != null ? vehicle.getModel() : null;
+    }
+
     @com.fasterxml.jackson.annotation.JsonProperty("userId")
     public Long getUserId() {
         return user != null ? user.getId() : null;

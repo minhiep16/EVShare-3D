@@ -4,7 +4,15 @@ import { downloadContract } from '../services/api';
 const ContractPage = ({ currentUser, vehicle, coOwners }) => {
   const currentVehicle = vehicle || { id: 1, model: 'Chưa có xe', licensePlate: 'N/A' };
   const members = coOwners?.length > 0 ? coOwners : [];
-  const [appendixSigned, setAppendixSigned] = useState(false);
+  const storageKey = `appendixSigned_${currentUser?.id || 'guest'}`;
+  const [appendixSigned, setAppendixSigned] = useState(() => {
+    return localStorage.getItem(storageKey) === 'true';
+  });
+
+  React.useEffect(() => {
+    setAppendixSigned(localStorage.getItem(storageKey) === 'true');
+  }, [storageKey]);
+
   const [showViewer, setShowViewer] = useState(false);
 
   // Dynamic Dates
@@ -26,6 +34,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
     const pin = prompt('Vui lòng nhập mã PIN ký số (mặc định: 1234):');
     if (pin === '1234') {
       setAppendixSigned(true);
+      localStorage.setItem(storageKey, 'true');
       alert('🎉 Ký số thành công! Phụ lục HĐ đã chuyển trạng thái sang "Đang chờ thành viên tiếp theo".');
     } else if (pin !== null) {
       alert('❌ Mã PIN không đúng. Giao dịch ký số bị từ chối.');

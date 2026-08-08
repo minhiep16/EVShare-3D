@@ -87,12 +87,12 @@ const AdminVehicles = () => {
             <h3 className="text-lg font-bold text-ink">Danh sách nhóm xe</h3>
             <p className="text-sm text-slate-500 mt-1">Quản lý chi tiết phương tiện và thành viên đồng sở hữu</p>
           </div>
-          <button 
-            onClick={() => alert('Chức năng thêm xe mới đang mở ở màn hình Trang chủ (Dashboard).')}
-            className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-2"
-          >
-            <i className="ph ph-plus-circle text-lg"></i>Thêm xe mới
-          </button>
+{/*           <button  */}
+{/*             onClick={() => alert('Chức năng thêm xe mới đang mở ở màn hình Trang chủ (Dashboard).')} */}
+{/*             className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-2" */}
+{/*           > */}
+{/*             <i className="ph ph-plus-circle text-lg"></i>Thêm xe mới */}
+{/*           </button> */}
         </div>
 
         <div className="overflow-x-auto">

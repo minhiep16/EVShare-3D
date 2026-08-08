@@ -264,3 +264,8 @@ export const getVehicleAnalytics = async () => {
   });
   return response.data;
 };
+
+export const updateProfile = async (data) => {
+  const response = await axios.patch(`${API_BASE_URL}/users/profile`, data);
+  return response.data;
+};

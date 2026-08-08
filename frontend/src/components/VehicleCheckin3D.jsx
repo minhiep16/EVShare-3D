@@ -83,11 +83,58 @@ const VehicleCheckin3D = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
+  const [activeTrips, setActiveTrips] = useState([]);
 
   useEffect(() => {
     fetchVehicles();
     fetchHistory();
+    checkActiveTrips();
+    
+    window.addEventListener('evshare_trip_update', checkActiveTrips);
+    return () => window.removeEventListener('evshare_trip_update', checkActiveTrips);
   }, []);
+
+  const checkActiveTrips = () => {
+    const saved = localStorage.getItem('evshare_activeTrips');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setActiveTrips(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        setActiveTrips([]);
+      }
+    } else {
+      setActiveTrips([]);
+    }
+  };
+
+  const idleVehicles = vehicles.filter(v => !activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString()));
+  const runningVehicles = vehicles.filter(v => activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString()));
+
+  const selectVehicleForMode = (vid, m) => {
+    setMode(m);
+    setSelectedVehicleId(vid);
+    const vData = vehicles.find(x => x.vehicle.id.toString() === vid.toString());
+    if (vData) {
+      setBattery(vData.vehicle.batteryPercentage);
+      setOdo(vData.vehicle.odometer);
+      
+      if (m === 'CHECKIN') {
+        const trip = activeTrips.find(t => t.vehicleId.toString() === vid.toString());
+        if (trip && trip.userId) {
+          setSelectedUserId(trip.userId);
+        } else if (vData.members && vData.members.length > 0) {
+          setSelectedUserId(vData.members[0].id);
+        }
+      } else {
+        if (vData.members && vData.members.length > 0) {
+          setSelectedUserId(vData.members[0].id);
+        } else {
+          setSelectedUserId('');
+        }
+      }
+    }
+  };
 
   const fetchHistory = async () => {
     try {
@@ -154,11 +201,45 @@ const VehicleCheckin3D = () => {
       };
 
       if (mode === 'CHECKOUT') {
+        const isRunning = activeTrips.some(t => t.vehicleId.toString() === selectedVehicleId.toString());
+        if (isRunning) {
+          alert("Xe này đang được giao cho người khác. Không thể giao xe!");
+          setSubmitting(false);
+          return;
+        }
+
         await checkoutVehicle(selectedVehicleId, payload);
-        alert(`Đã hoàn tất Giao xe (Check-out) thành công!\nXe: ${vehicleObj?.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười nhận: ${vehicleMembers.find(m => m.id.toString() === selectedUserId.toString())?.name}`);
+        const userName = vehicleMembers.find(m => m.id.toString() === selectedUserId.toString())?.name || "Thành viên";
+        
+        let existing = [];
+        try { existing = JSON.parse(localStorage.getItem('evshare_activeTrips') || '[]'); if (!Array.isArray(existing)) existing = []; } catch(e) {}
+        
+        // Remove any existing trip for this vehicle just in case
+        existing = existing.filter(t => t.vehicleId.toString() !== selectedVehicleId.toString());
+        
+        existing.push({
+          vehicleId: selectedVehicleId,
+          vehiclePlate: vehicleObj?.licensePlate || vehicleObj?.model,
+          userId: selectedUserId,
+          userName: userName,
+          startTime: timestamp
+        });
+        
+        localStorage.setItem('evshare_activeTrips', JSON.stringify(existing));
+        window.dispatchEvent(new Event('evshare_trip_update'));
+        
+        alert(`Đã hoàn tất Giao xe (Check-out) thành công!\nXe: ${vehicleObj?.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười nhận: ${userName}`);
       } else {
         const res = await checkinVehicle(selectedVehicleId, payload);
         const cost = res.cost || 0;
+        
+        let existing = [];
+        try { existing = JSON.parse(localStorage.getItem('evshare_activeTrips') || '[]'); if (!Array.isArray(existing)) existing = []; } catch(e) {}
+        
+        const filtered = existing.filter(t => t.vehicleId.toString() !== selectedVehicleId.toString());
+        localStorage.setItem('evshare_activeTrips', JSON.stringify(filtered));
+        window.dispatchEvent(new Event('evshare_trip_update'));
+        
         alert(`Đã hoàn tất Nhận xe (Check-in) thành công!\nXe: ${vehicleObj?.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười trả: ${vehicleMembers.find(m => m.id.toString() === selectedUserId.toString())?.name}\n\nChi phí phát sinh (nếu có): ${cost.toLocaleString()} VNĐ`);
       }
       setDamages([]);
@@ -178,18 +259,17 @@ const VehicleCheckin3D = () => {
       <div className="flex-1 flex flex-col gap-4">
         {/* Top bar */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <h2 className="font-bold text-lg text-ink flex items-center gap-2">
+            <i className="ph-fill ph-car-profile text-brand-500 text-xl"></i>
+            Hệ thống Giao / Nhận xe 3D
+          </h2>
+          
           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
             <button 
               onClick={() => setMode('CHECKIN')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'CHECKIN' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mode !== 'HISTORY' ? 'bg-white shadow-sm text-brand-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <i className="ph ph-sign-in mr-2"></i>Nhận xe (Check-in)
-            </button>
-            <button 
-              onClick={() => setMode('CHECKOUT')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${mode === 'CHECKOUT' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <i className="ph ph-sign-out mr-2"></i>Giao xe (Check-out)
+              <i className="ph ph-cube mr-2"></i>Mô hình 3D
             </button>
             <button 
               onClick={() => setMode('HISTORY')}
@@ -198,48 +278,50 @@ const VehicleCheckin3D = () => {
               <i className="ph ph-clock-counter-clockwise mr-2"></i>Lịch sử
             </button>
           </div>
+        </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-semibold text-slate-700">Chọn xe:</label>
-              <select 
-                value={selectedVehicleId}
-                onChange={(e) => {
-                  setSelectedVehicleId(e.target.value);
-                  const vData = vehicles.find(x => x.vehicle.id.toString() === e.target.value);
-                  if (vData) {
-                    setBattery(vData.vehicle.batteryPercentage);
-                    setOdo(vData.vehicle.odometer);
-                    if (vData.members && vData.members.length > 0) {
-                      setSelectedUserId(vData.members[0].id);
-                    } else {
-                      setSelectedUserId('');
-                    }
-                  }
-                }}
-                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              >
-                {vehicles.map(v => (
-                  <option key={v.vehicle.id} value={v.vehicle.id}>
-                    {v.vehicle.licensePlate} ({v.vehicle.model})
-                  </option>
+        {/* Vehicle Status Panel */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="font-bold text-sm text-slate-700 mb-3 uppercase tracking-wider">Trạng thái xe hiện tại</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {/* Xe Trống */}
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500">XE TRỐNG (SẴN SÀNG GIAO)</span>
+                <span className="bg-white px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">{idleVehicles.length}</span>
+              </div>
+              <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                {idleVehicles.map(v => (
+                  <button key={v.vehicle.id} onClick={() => selectVehicleForMode(v.vehicle.id, 'CHECKOUT')} className="w-full text-left bg-white border border-slate-200 hover:border-brand-300 p-2 rounded-lg text-sm transition-colors flex justify-between items-center group">
+                    <span className="font-bold text-ink">{v.vehicle.licensePlate}</span>
+                    <i className="ph ph-sign-out text-slate-400 group-hover:text-brand-500"></i>
+                  </button>
                 ))}
-              </select>
+                {idleVehicles.length === 0 && <p className="text-xs text-slate-400 text-center py-2">Không có xe trống</p>}
+              </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-semibold text-slate-700">Người dùng:</label>
-              <select 
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-              >
-                {vehicleMembers.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name || "Không rõ tên"}
-                  </option>
-                ))}
-              </select>
+            {/* Xe Đang Chạy */}
+            <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-brand-700">ĐANG CHẠY (CHỜ NHẬN)</span>
+                <span className="bg-white px-2 py-0.5 rounded-full text-xs font-bold text-brand-600 shadow-sm">{runningVehicles.length}</span>
+              </div>
+              <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                {runningVehicles.map(v => {
+                  const tripInfo = activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString());
+                  return (
+                    <button key={v.vehicle.id} onClick={() => selectVehicleForMode(v.vehicle.id, 'CHECKIN')} className="w-full text-left bg-white border border-brand-200 hover:border-brand-400 p-2 rounded-lg text-sm transition-colors flex justify-between items-center group shadow-sm shadow-brand-500/5">
+                      <div>
+                        <span className="font-bold text-brand-700 block">{v.vehicle.licensePlate}</span>
+                        <span className="text-[10px] text-brand-500/80 font-medium block">{tripInfo?.userName}</span>
+                      </div>
+                      <i className="ph ph-sign-in text-brand-400 group-hover:text-brand-600 text-lg"></i>
+                    </button>
+                  );
+                })}
+                {runningVehicles.length === 0 && <p className="text-xs text-brand-400/70 text-center py-2">Không có xe đang chạy</p>}
+              </div>
             </div>
           </div>
         </div>
@@ -269,13 +351,13 @@ const VehicleCheckin3D = () => {
                       <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString('vi-VN')}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-ink">{log.user?.name}</td>
+                      <td className="px-4 py-3 font-semibold text-ink">{log.userName || "Hệ thống"}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase ${log.type === 'CHECKIN' ? 'bg-brand-50 text-brand-600' : 'bg-blue-50 text-blue-600'}`}>
                           {log.type === 'CHECKIN' ? 'Nhận xe' : 'Giao xe'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-semibold">{log.vehicle?.licensePlate}</td>
+                      <td className="px-4 py-3 font-semibold">{log.vehiclePlate ? `${log.vehicleModel || 'Xe'} - ${log.vehiclePlate}` : (log.vehicle?.licensePlate || "Xe mặc định")}</td>
                       <td className="px-4 py-3 text-slate-600 text-xs">
                         <span className="text-blue-600 font-bold">{log.odometer} km</span> <br/>
                         <span className="text-brand-600 font-bold">{log.batteryPercentage}% pin</span>
@@ -328,8 +410,39 @@ const VehicleCheckin3D = () => {
         
         {/* Vehicle Stats Input */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="font-bold text-base mb-4 flex items-center gap-2">
-            <i className="ph-fill ph-gauge text-slate-400"></i> Thông số hiện tại
+          <div className="mb-5 pb-4 border-b border-slate-100">
+            <h3 className={`font-bold text-lg flex items-center gap-2 mb-2 ${mode === 'CHECKIN' ? 'text-brand-600' : 'text-blue-600'}`}>
+              <i className={mode === 'CHECKIN' ? 'ph-fill ph-sign-in' : 'ph-fill ph-sign-out'}></i> 
+              THỦ TỤC {mode === 'CHECKIN' ? 'NHẬN XE' : 'GIAO XE'}
+            </h3>
+            <p className="text-sm font-bold text-ink bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
+              {vehicleObj?.licensePlate} - {vehicleObj?.model}
+            </p>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-slate-500 mb-1">Thành viên {mode === 'CHECKIN' ? 'trả xe' : 'nhận xe'}</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i className="ph ph-user text-slate-400"></i>
+              </div>
+              <select 
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                disabled={mode === 'CHECKIN'}
+                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-500"
+              >
+                {vehicleMembers.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.name || "Không rõ tên"}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-slate-700 mt-5">
+            <i className="ph-fill ph-gauge text-slate-400"></i> Thông số kỹ thuật
           </h3>
           
           <div className="mb-4">
