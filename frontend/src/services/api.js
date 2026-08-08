@@ -204,8 +204,12 @@ export const getVehicleTransactions = async (vehicleId) => {
   return response.data;
 };
 
-export const solveDispute = async (id, resolution) => {
-  const response = await axios.patch(`${API_BASE_URL}/admin/disputes/${id}/solve`, { resolution });
+export const solveDispute = async (id, resolution, penaltyAmount, accusedUserId) => {
+  const response = await axios.patch(`${API_BASE_URL}/admin/disputes/${id}/solve`, { 
+    resolution,
+    penaltyAmount,
+    accusedUserId
+  });
   return response.data;
 };
 
@@ -234,5 +238,29 @@ export const getAdminCheckinLogs = async () => {
 
 export const getUserCheckinLogs = async () => {
   const response = await axios.get(`${API_BASE_URL}/checkin-logs`);
+  return response.data;
+};
+
+export const getMyTransactions = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.get(`${API_BASE_URL}/transactions/my-history`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getRevenueAnalytics = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.get(`${API_BASE_URL}/admin/finance/analytics/revenue`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getVehicleAnalytics = async () => {
+  const token = localStorage.getItem('evshare_jwt_token');
+  const response = await axios.get(`${API_BASE_URL}/admin/finance/analytics/vehicles`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
   return response.data;
 };

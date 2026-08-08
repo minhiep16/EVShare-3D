@@ -21,25 +21,29 @@ import VehicleCheckin3D from './components/VehicleCheckin3D';
 import AdminVehicles from './components/AdminVehicles';
 import AdminContracts from './components/AdminContracts';
 import AdminUsers from './components/AdminUsers';
-import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle, approveJoinRequest, rejectJoinRequest } from './services/api';
+import TransactionLedger from './components/TransactionLedger';
+import { getDashboardData, createBooking, castVote, createVehicle, getUnassignedUsers, addMemberToVehicle, requestJoinVehicle, approveJoinRequest, rejectJoinRequest, depositWallet } from './services/api';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('evshare_isAuthenticated') === 'true');
   const [currentUserInfo, setCurrentUserInfo] = useState(() => {
     const saved = localStorage.getItem('evshare_currentUserInfo');
     return saved ? JSON.parse(saved) : null;
   });
   const currentRole = currentUserInfo?.role || 'USER';
   
+  const [activeTab, setActiveTab] = useState(() => {
+    return currentRole === 'ADMIN' ? 'admin_dashboard' : 'dashboard';
+  });
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('evshare_isAuthenticated') === 'true');
+
   const [isCreateVehicleModalOpen, setIsCreateVehicleModalOpen] = useState(false);
   const [newVehicle, setNewVehicle] = useState({ model: '', licensePlate: '', imageUrl: '' });
   const [creatingVehicle, setCreatingVehicle] = useState(false);
-  
+
   // Add Member Modal State (for Group Leader)
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [unassignedUsers, setUnassignedUsers] = useState([]);
@@ -84,15 +88,13 @@ function App() {
     fetchDashboard();
   };
 
-  const handleVoteClick = async (voteId, agree) => {
+  const handleVoteClick = async (voteId) => {
     try {
-      if (voteId) {
-        await castVote(voteId, agree);
-      }
+      await castVote(voteId);
       fetchDashboard();
     } catch (err) {
       console.error(err);
-      alert('Không thể thực hiện bỏ phiếu: ' + (err.response?.data?.message || err.response?.data || err.message));
+      alert('Không thể thực hiện bỏ phiếu.');
     }
   };
 
@@ -128,20 +130,20 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <LoginPage 
+      <LoginPage
         onLoginSuccess={(role, userInfo) => {
           const infoWithRole = { ...userInfo, role };
           setIsAuthenticated(true);
           localStorage.setItem('evshare_isAuthenticated', 'true');
           setCurrentUserInfo(infoWithRole);
           localStorage.setItem('evshare_currentUserInfo', JSON.stringify(infoWithRole));
-          
+
           if (role === 'ADMIN') {
             setActiveTab('admin_dashboard');
           } else {
             setActiveTab('dashboard');
           }
-        }} 
+        }}
       />
     );
   }
@@ -164,7 +166,7 @@ function App() {
           </div>
           <h2 className="text-lg font-bold text-ink mb-2">Lỗi Kết Nối</h2>
           <p className="text-sm text-slate-500 mb-6">{error}</p>
-          <button 
+          <button
             onClick={() => {
               let uid = 1;
               if (currentUserInfo) {
@@ -188,7 +190,8 @@ function App() {
     id: currentUserInfo.id,
     name: currentUserInfo.fullName,
     avatarUrl: currentUserInfo.avatarUrl || (currentRole === 'ADMIN' ? 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg' : 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg'),
-    role: currentRole === 'ADMIN' ? 'Administrator' : 'Co-owner'
+    role: currentRole === 'ADMIN' ? 'Administrator' : 'Co-owner',
+    walletBalance: currentUserInfo.walletBalance || 0
   } : null;
 
   // Find the exact profile from the backend data using activeUser.id
@@ -198,12 +201,14 @@ function App() {
     id: userProfile?.id || 1,
     name: userProfile?.name || 'Nguyễn Thị Mai',
     avatarUrl: userProfile?.avatarUrl || 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg',
-    role: 'Co-owner'
+    role: 'Co-owner',
+    walletBalance: userProfile?.walletBalance || 0
   } : {
     id: 4,
     name: 'Phạm Quốc Hùng',
     avatarUrl: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg',
-    role: 'Administrator'
+    role: 'Administrator',
+    walletBalance: 0
   });
   
   const currentUser = {
@@ -212,7 +217,8 @@ function App() {
     isGroupLeader: userProfile?.isGroupLeader || false,
     ownershipPercentage: userProfile?.ownershipPercentage || 0,
     requestedVehicleId: userProfile?.requestedVehicleId || null,
-    status: userProfile?.status || currentUserInfo?.status || 'PENDING_APPROVAL'
+    status: userProfile?.status || currentUserInfo?.status || 'PENDING_APPROVAL',
+    walletBalance: currentUserInfo?.walletBalance || userProfile?.walletBalance || currentUserBase?.walletBalance || 0
   };
   const ownershipPercentage = userProfile?.ownershipPercentage || 40;
 
@@ -223,9 +229,9 @@ function App() {
   return (
     <div className="bg-slate-50 text-ink font-sans antialiased min-h-screen flex">
       {/* Desktop Sidebar */}
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         currentUser={currentUser}
         notificationCount={3}
         currentRole={currentRole}
@@ -249,7 +255,7 @@ function App() {
                 <span className="text-brand-500"><i className="ph-fill ph-lightning text-2xl"></i></span>
                 <span className="text-xl font-semibold tracking-tight text-white">EVShare</span>
               </div>
-              <button 
+              <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-slate-400 hover:text-white"
               >
@@ -258,12 +264,12 @@ function App() {
             </div>
             {/* Reuse navbar links in mobile sidebar */}
             <div className="flex-1 overflow-y-auto py-4">
-              <Sidebar 
-                activeTab={activeTab} 
+              <Sidebar
+                activeTab={activeTab}
                 setActiveTab={(tab) => {
                   setActiveTab(tab);
                   setMobileMenuOpen(false);
-                }} 
+                }}
                 currentUser={currentUser}
                 notificationCount={3}
                 currentRole={currentRole}
@@ -276,7 +282,10 @@ function App() {
                   localStorage.removeItem('evshare_currentUserInfo');
                   localStorage.removeItem('evshare_jwt_token');
                 }}
-                onDepositWalletClick={() => setShowDepositWalletModal(true)}
+                onDepositWalletClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowDepositWalletModal(true);
+                }}
               />
             </div>
           </div>
@@ -286,36 +295,24 @@ function App() {
 
       {/* Main content body */}
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
-        <Header 
-          currentUser={currentUser} 
+        <Header
+          currentUser={currentUser}
           activeTab={activeTab}
-          coOwners={data?.coOwners || []}
-          vehicle={data?.vehicle}
           onMenuToggle={() => setMobileMenuOpen(true)}
           onCreateVehicle={() => setIsCreateVehicleModalOpen(true)}
-          onAddMemberClick={async () => {
-            try {
-              const users = await getUnassignedUsers();
-              setUnassignedUsers(users);
-              setShowAddMemberModal(true);
-            } catch (e) {
-              alert('Lỗi khi tải danh sách user trống: ' + e.message);
-            }
-          }}
         />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="max-w-[1400px] mx-auto space-y-6">
-            
+
             {activeTab === 'dashboard' && (
               <>
                 {data?.vehicle ? (
                   <>
                     {/* Row 1: Vehicle Hero */}
-                    <VehicleHero 
+                    <VehicleHero
                       vehicle={data?.vehicle}
                       coOwnersCount={data?.coOwners?.length || 3}
-                      coOwners={data?.coOwners || []}
                       ownershipPercentage={ownershipPercentage}
                       onBookNow={() => setActiveTab('booking')}
                     />
@@ -325,100 +322,50 @@ function App() {
 
                     {/* Row 3: Calendar Scheduler + Cost Chart */}
                     <section className="grid grid-cols-1 xl:grid-cols-10 gap-6">
-                      <BookingCalendar 
-                        bookings={data?.bookings || []} 
+                      <BookingCalendar
+                        bookings={data?.bookings || []}
                         onSelectAll={() => alert('Chi tiết toàn bộ lịch đặt xe sẽ được hiển thị!')}
                       />
-                      
+
                       <CostChart transactions={data?.transactions || []} />
                     </section>
 
                     {/* Row 4: Owner Group + AI Suggestions */}
                     <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <CoOwners 
+                      <CoOwners
                         coOwners={data?.coOwners || []}
                         activeVotes={data?.activeVotes || []}
                         onVoteClick={handleVoteClick}
                       />
 
-                      <AISuggestions 
+                      <AISuggestions
                         suggestions={data?.suggestions || []}
                         onAIChatClick={handleAIChat}
                       />
                     </section>
                   </>
-                ) : currentUser.status === 'PENDING_APPROVAL' ? (
-                  <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm max-w-2xl mx-auto mt-8 animate-fade-in">
-                    <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
-                      <i className="ph ph-shield-warning"></i>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">Hồ sơ tài khoản chờ phê duyệt</h3>
-                    <p className="text-sm text-slate-500 mb-6">
-                      Tài khoản của bạn đang trong trạng thái chờ quản trị viên phê duyệt xác minh tài liệu (CCCD & GPLX). 
-                      Chỉ sau khi hồ sơ được duyệt, bạn mới có thể thực hiện xin vào nhóm hoặc được các thành viên khác mời vào nhóm xe.
-                    </p>
-                    <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-600 inline-flex flex-col gap-1 text-left">
-                      <div>• <strong>Họ tên:</strong> {currentUserInfo?.fullName}</div>
-                      <div>• <strong>Số điện thoại:</strong> {currentUserInfo?.phone}</div>
-                      <div>• <strong>Trạng thái:</strong> ⏳ Đang chờ xác minh</div>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-sm">
-                      <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 animate-pulse">
-                        <i className="ph ph-hourglass-high"></i>
-                      </div>
-                      <h3 className="text-xl font-bold text-ink mb-2">Tài khoản đang chờ xử lý</h3>
-                      <p className="text-sm text-slate-500 max-w-md mx-auto mb-2">
-                        Tài khoản của bạn đã được ghi nhận. Vui lòng chọn một nhóm xe bên dưới để xin tham gia. 
-                        Sau khi được Admin hoặc Nhóm trưởng duyệt, bạn sẽ có quyền truy cập đầy đủ.
-                      </p>
+                  <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">
+                    <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounce">
+                      <i className="ph ph-car-profile"></i>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {data?.availableVehicles?.map(v => (
-                        <div key={v.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                          <img 
-                            src={v.imageUrl || "https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&w=400&q=80"} 
-                            alt={v.model}
-                            className="w-full h-32 object-cover rounded-xl mb-4"
-                          />
-                          <h4 className="font-bold text-lg mb-1">{v.model}</h4>
-                          <p className="text-sm text-slate-500 font-medium mb-4">{v.licensePlate} • Nhóm #{v.id}</p>
-                          
-                          <div className="flex gap-2">
-                            <button
-                              disabled={currentUser.requestedVehicleId === v.id || isSubmitting}
-                              onClick={async () => {
-                                try {
-                                  setIsSubmitting(true);
-                                  await requestJoinVehicle(v.id);
-                                  alert('✅ Đã gửi yêu cầu tham gia thành công! Vui lòng chờ phản hồi.');
-                                  fetchDashboard(currentUser.id);
-                                } catch (e) {
-                                  alert('Lỗi: ' + (e.response?.data || e.message));
-                                } finally {
-                                  setIsSubmitting(false);
-                                }
-                              }}
-                              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                                currentUser.requestedVehicleId === v.id 
-                                  ? 'bg-amber-100 text-amber-700 cursor-not-allowed'
-                                  : 'bg-[#22c55e] hover:bg-[#16a34a] text-white cursor-pointer'
-                              }`}
-                            >
-                              {currentUser.requestedVehicleId === v.id ? '⏳ Đang chờ duyệt...' : 'Xin vào nhóm'}
-                            </button>
-                            <button 
-                              onClick={() => alert(`📑 Mở chi tiết hợp đồng cho xe ${v.model}`)}
-                              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
-                            >
-                              <i className="ph ph-file-text text-lg"></i>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                    <h3 className="text-xl font-bold text-ink mb-2">Chào mừng thành viên mới!</h3>
+                    <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+                      Tài khoản của bạn đã được đăng ký thành công trên database. Hiện tại bạn chưa tham gia nhóm đồng sở hữu xe nào trong hệ thống EVShare.
+                    </p>
+                    <div className="flex justify-center gap-3">
+                      <button
+                        onClick={() => setIsCreateVehicleModalOpen(true)}
+                        className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm font-semibold"
+                      >
+                        Tạo nhóm xe mới
+                      </button>
+                      <button
+                        onClick={() => alert('📞 Hotline hỗ trợ gia nhập nhóm xe: 1900-xxxx')}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm font-semibold"
+                      >
+                        Liên hệ hỗ trợ
+                      </button>
                     </div>
                   </div>
                 )}
@@ -426,7 +373,7 @@ function App() {
             )}
 
             {activeTab === 'booking' && (
-              <BookingPage 
+              <BookingPage
                 bookings={data?.bookings || []}
                 coOwners={data?.coOwners || []}
                 currentUser={currentUser}
@@ -435,7 +382,7 @@ function App() {
             )}
 
             {activeTab === 'cost' && (
-              <CostPage 
+              <CostPage
                 transactions={data?.transactions || []}
                 coOwners={data?.coOwners || []}
                 currentUser={currentUser}
@@ -443,7 +390,7 @@ function App() {
             )}
 
             {activeTab === 'group' && (
-              <GroupPage 
+              <GroupPage
                 coOwners={data?.coOwners || []}
                 activeVotes={data?.activeVotes || []}
                 currentUser={currentUser}
@@ -452,14 +399,14 @@ function App() {
             )}
 
             {activeTab === 'history' && (
-              <HistoryPage 
+              <HistoryPage
                 currentUser={currentUser}
                 bookings={data?.bookings || []}
               />
             )}
 
             {activeTab === 'contract' && (
-              <ContractPage 
+              <ContractPage
                 currentUser={currentUser}
                 vehicle={data?.vehicle}
                 coOwners={data?.coOwners || []}
@@ -490,22 +437,22 @@ function App() {
               <AdminVehicles />
             )}
 
-            {activeTab === 'admin_users' && (
-              <AdminUsers />
-            )}
-
             {activeTab === 'admin_contracts' && (
               <AdminContracts />
             )}
 
-            {['admin_staff'].includes(activeTab) && (
+            {activeTab === 'admin_users' && (
+              <AdminUsers />
+            )}
+
+            {['admin_checkin', 'admin_staff'].includes(activeTab) && (
               <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
                 <div className="w-16 h-16 bg-violet-50 text-violet-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
                   <i className="ph ph-squares-four text-violet-600"></i>
                 </div>
                 <h3 className="text-lg font-bold text-ink mb-1">Chức năng Admin đang phát triển</h3>
                 <p className="text-sm text-slate-500 mb-6">Trang này đang được phát triển trong phiên bản tiếp theo của phân hệ quản trị.</p>
-                <button 
+                <button
                   onClick={() => setActiveTab('admin_dashboard')}
                   className="bg-violet-600 hover:bg-violet-700 text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm"
                 >
@@ -521,7 +468,7 @@ function App() {
                 </div>
                 <h3 className="text-lg font-bold text-ink mb-1">Chức năng đang được cập nhật</h3>
                 <p className="text-sm text-slate-500 mb-6">Trang này đang được phát triển trong phiên bản tiếp theo.</p>
-                <button 
+                <button
                   onClick={() => setActiveTab('dashboard')}
                   className="bg-brand-500 hover:bg-brand-600 text-white font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer text-sm"
                 >
@@ -537,96 +484,66 @@ function App() {
       {/* Create Vehicle Modal */}
       {isCreateVehicleModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up border border-slate-100">
-            {/* Modal Header */}
-            <div className="bg-gradient-to-r from-brand-600 to-brand-500 p-6 flex items-start justify-between relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-              <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-              
-              <div className="relative z-10">
-                <h3 className="text-xl font-bold text-white mb-1">Thêm Nhóm Xe Mới</h3>
-                <p className="text-brand-100 text-xs">Khởi tạo và cấu hình phương tiện vào hệ thống</p>
-              </div>
-              <button 
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fade-in-up">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                <i className="ph ph-car-profile text-brand-500"></i>Tạo nhóm xe mới
+              </h3>
+              <button
                 onClick={() => setIsCreateVehicleModalOpen(false)}
-                className="relative z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
               >
                 <i className="ph ph-x"></i>
               </button>
             </div>
-            
-            <form onSubmit={handleCreateVehicleSubmit} className="p-6 space-y-5">
-              {/* Form Body */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Dòng xe (Model) <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <i className="ph ph-car text-slate-400 text-lg"></i>
-                    </div>
-                    <input 
-                      type="text"
-                      required
-                      placeholder="VD: VinFast VF8"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-medium text-ink placeholder:font-normal"
-                      value={newVehicle.model}
-                      onChange={e => setNewVehicle({...newVehicle, model: e.target.value})}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Biển số xe <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <i className="ph ph-tag text-slate-400 text-lg"></i>
-                    </div>
-                    <input 
-                      type="text"
-                      required
-                      placeholder="VD: 51H-123.45"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-mono font-bold text-ink placeholder:font-normal placeholder:font-sans"
-                      value={newVehicle.licensePlate}
-                      onChange={e => setNewVehicle({...newVehicle, licensePlate: e.target.value})}
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">Hình ảnh xe (URL)</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                      <i className="ph ph-image text-slate-400 text-lg"></i>
-                    </div>
-                    <input 
-                      type="url"
-                      placeholder="https://..."
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 focus:bg-white transition-all font-medium text-ink placeholder:font-normal"
-                      value={newVehicle.imageUrl}
-                      onChange={e => setNewVehicle({...newVehicle, imageUrl: e.target.value})}
-                    />
-                  </div>
-                  {newVehicle.imageUrl && (
-                    <div className="mt-3 rounded-lg overflow-hidden border border-slate-200 h-28 relative bg-slate-100">
-                      <img src={newVehicle.imageUrl} className="w-full h-full object-cover" alt="Preview" onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=800&q=80"; }}/>
-                      <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-md">Preview</div>
-                    </div>
-                  )}
-                </div>
+            <form onSubmit={handleCreateVehicleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Dòng xe (Model) <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: VinFast VF8"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.model}
+                  onChange={e => setNewVehicle({ ...newVehicle, model: e.target.value })}
+                />
               </div>
-              
-              <div className="pt-4 border-t border-slate-100">
-                <button 
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Biển số xe <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: 51H-123.45"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.licensePlate}
+                  onChange={e => setNewVehicle({ ...newVehicle, licensePlate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Hình ảnh (URL)</label>
+                <input
+                  type="url"
+                  placeholder="Để trống sẽ dùng ảnh mặc định"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  value={newVehicle.imageUrl}
+                  onChange={e => setNewVehicle({ ...newVehicle, imageUrl: e.target.value })}
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
                   type="submit"
                   disabled={creatingVehicle}
-                  className={`w-full py-3.5 rounded-xl text-sm font-bold text-white transition-all shadow-lg shadow-brand-500/20 cursor-pointer flex items-center justify-center gap-2 ${
-                    creatingVehicle ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 hover:-translate-y-0.5'
-                  }`}
+                  className={`w-full py-2.5 rounded-lg text-sm font-bold text-white transition-colors cursor-pointer flex items-center justify-center gap-2 ${creatingVehicle ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                    }`}
                 >
                   {creatingVehicle ? (
-                    <><i className="ph ph-spinner animate-spin text-xl"></i> Đang khởi tạo...</>
+                    <><i className="ph ph-spinner animate-spin text-lg"></i>Đang khởi tạo...</>
                   ) : (
-                    <><i className="ph ph-rocket-launch text-xl"></i> Khởi tạo Nhóm Xe</>
+                    <><i className="ph ph-plus-circle text-lg"></i>Tạo Nhóm Xe</>
                   )}
                 </button>
               </div>
@@ -635,224 +552,113 @@ function App() {
         </div>
       )}
 
-      {/* Add Member Modal (Group Leader) */}
-      {showAddMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] p-6 flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#22c55e] shrink-0">
-                <i className="ph-fill ph-user-plus text-2xl"></i>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-ink mb-1">Thêm Thành Viên</h3>
-                <p className="text-sm text-[#16a34a]/80">Mời người dùng vào nhóm xe. Thành viên mới sẽ có 0% cổ phần ban đầu.</p>
-              </div>
+      {/* Deposit Wallet Modal */}
+      {showDepositWalletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden animate-scale-in flex flex-col border border-white/20">
+            {/* Header with Gradient */}
+            <div className="px-6 py-5 bg-gradient-to-r from-brand-600 to-indigo-600 flex items-center justify-between shrink-0">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <i className="ph-fill ph-wallet text-2xl text-white/90"></i>
+                Nạp tiền vào ví
+              </h3>
               <button 
-                onClick={() => setShowAddMemberModal(false)}
-                className="w-8 h-8 rounded-full bg-white/50 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center shrink-0"
+                onClick={() => setShowDepositWalletModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all"
               >
                 <i className="ph ph-x text-lg"></i>
               </button>
             </div>
             
-            {(() => {
-              const pendingRequests = unassignedUsers.filter(user => user.requestedVehicleId === data?.vehicle?.id);
-              const otherUsers = unassignedUsers.filter(user => user.requestedVehicleId !== data?.vehicle?.id);
-              return (
-                <div className="p-6 space-y-6">
-                  {/* Section 1: Pending Join Requests */}
-                  {pendingRequests.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-bold text-slate-700 flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                        Yêu cầu gia nhập xe này ({pendingRequests.length})
-                      </h4>
-                      <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1">
-                        {pendingRequests.map(user => (
-                          <div key={user.id} className="flex items-center justify-between p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
-                            <div className="flex items-center gap-2">
-                              <img src={user.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-8 h-8 rounded-full object-cover shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-ink truncate">{user.name || user.username}</p>
-                                <p className="text-[11px] text-slate-400">ID: {user.id} · {user.phone}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-1.5 shrink-0">
-                              <button
-                                disabled={isSubmitting}
-                                onClick={async () => {
-                                  try {
-                                    setIsSubmitting(true);
-                                    await approveJoinRequest(data?.vehicle?.id, user.id);
-                                    alert('✅ Đã duyệt và thêm thành viên vào xe!');
-                                    const updated = await getUnassignedUsers();
-                                    setUnassignedUsers(updated);
-                                    fetchDashboard(currentUserInfo.id);
-                                  } catch (e) {
-                                    alert('Duyệt thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
-                                  } finally {
-                                    setIsSubmitting(false);
-                                  }
-                                }}
-                                className="text-xs bg-[#22c55e] hover:bg-[#16a34a] text-white px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
-                              >
-                                Duyệt
-                              </button>
-                              <button
-                                disabled={isSubmitting}
-                                onClick={async () => {
-                                  try {
-                                    setIsSubmitting(true);
-                                    await rejectJoinRequest(data?.vehicle?.id, user.id);
-                                    alert('❌ Đã từ chối yêu cầu gia nhập.');
-                                    const updated = await getUnassignedUsers();
-                                    setUnassignedUsers(updated);
-                                    fetchDashboard(currentUserInfo.id);
-                                  } catch (e) {
-                                    alert('Từ chối thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
-                                  } finally {
-                                    setIsSubmitting(false);
-                                  }
-                                }}
-                                className="text-xs border border-slate-200 text-slate-600 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
-                              >
-                                Từ chối
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50 relative">
+              {/* Current Balance Card */}
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-100 mb-6 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-brand-100/50 to-transparent rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110"></div>
+                <p className="text-sm text-slate-500 font-medium mb-1 relative z-10">Số dư hiện tại</p>
+                <p className="text-3xl font-black text-slate-900 tracking-tight relative z-10">
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(currentUser.walletBalance || 0)}
+                </p>
+              </div>
 
-                  {/* Section 2: Add Direct / Other unassigned users */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-bold text-slate-700 border-b border-slate-100 pb-2">
-                      Thêm trực tiếp thành viên khác
-                    </h4>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1.5">Chọn người dùng</label>
-                      {otherUsers.length === 0 ? (
-                        <div className="p-3 bg-slate-50 text-slate-500 rounded-lg text-xs text-center border border-slate-200">
-                          Không có người dùng trống nào khác.
-                        </div>
-                      ) : (
-                        <select 
-                          value={selectedUserId}
-                          onChange={(e) => setSelectedUserId(e.target.value)}
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-medium text-ink"
-                        >
-                          <option value="">-- Chọn thành viên --</option>
-                          {otherUsers.map(user => (
-                            <option key={user.id} value={user.id}>
-                              {user.name || user.username} (ID: {user.id}) {user.phone ? `· ${user.phone}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                    
-                    <button 
-                      onClick={async () => {
-                        if (!selectedUserId) return alert('Vui lòng chọn người dùng!');
-                        try {
-                          setIsSubmitting(true);
-                          await addMemberToVehicle(data?.vehicle?.id, selectedUserId, 0); // 0% by default
-                          alert('✅ Đã thêm thành viên thành công!');
-                          setSelectedUserId('');
-                          setShowAddMemberModal(false);
-                          fetchDashboard(currentUserInfo.id); // reload dashboard
-                        } catch (e) {
-                          alert('Lỗi: ' + (e.response?.data || e.message));
-                        } finally {
-                          setIsSubmitting(false);
-                        }
-                      }}
-                      disabled={isSubmitting || !selectedUserId}
-                      className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSubmitting ? 'Đang thêm...' : 'Xác nhận Thêm'}
-                    </button>
+              {/* Transaction Ledger Component Embedded Here */}
+              <TransactionLedger userId={currentUserInfo?.id} currentBalance={currentUser.walletBalance} />
+            </div>
+            
+            <div className="px-6 py-5 border-t border-slate-100 bg-white shrink-0 shadow-[0_-4px_15px_-5px_rgba(0,0,0,0.05)] z-20">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const amt = parseFloat(depositAmount);
+                if (isNaN(amt) || amt < 10000) {
+                  alert("Số tiền nạp tối thiểu là 10,000đ");
+                  return;
+                }
+                setIsSubmittingWallet(true);
+                try {
+                  // CORRECT API CALL: only pass amt (id is derived from token in backend)
+                  await depositWallet(amt);
+                  alert(`Đã nạp thành công ${amt.toLocaleString()}đ vào ví!`);
+                  setDepositAmount('');
+                  // Force a refresh of the dashboard to update balance
+                  await fetchDashboard(currentUserInfo?.id);
+                  // Auto close
+                  setShowDepositWalletModal(false);
+                } catch(err) {
+                  console.error(err);
+                  alert("Lỗi khi nạp tiền: " + (err.response?.data || err.message));
+                } finally {
+                  setIsSubmittingWallet(false);
+                }
+              }}>
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chọn số tiền nhanh</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[50000, 100000, 200000, 500000].map(amount => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setDepositAmount(amount.toString())}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          depositAmount === amount.toString()
+                            ? 'bg-brand-50 text-brand-600 border border-brand-200'
+                            : 'bg-white text-slate-600 border border-slate-200 hover:border-brand-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {amount / 1000}k
+                      </button>
+                    ))}
                   </div>
                 </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
 
-      {/* Deposit Personal Wallet Modal */}
-      {showDepositWalletModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="bg-gradient-to-br from-[#ecfdf5] to-[#d1fae5] p-6 flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-[#22c55e] shrink-0">
-                <i className="ph-fill ph-wallet text-2xl"></i>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-ink mb-1">Nạp tiền Ví cá nhân</h3>
-                <p className="text-sm text-[#16a34a]/80">Nạp số dư để tự động thanh toán khấu hao hành trình & các chi phí phát sinh.</p>
-              </div>
-              <button 
-                onClick={() => {
-                  setShowDepositWalletModal(false);
-                  setDepositAmount('');
-                }}
-                className="w-8 h-8 rounded-full bg-white/50 hover:bg-white text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center shrink-0"
-              >
-                <i className="ph ph-x text-lg"></i>
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Số tiền muốn nạp (VNĐ)</label>
-                <input 
-                  type="number" 
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  placeholder="Nhập số tiền..."
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#22c55e] focus:ring-2 focus:ring-[#22c55e]/20 transition-all font-semibold text-ink"
-                />
-              </div>
-
-              {/* Quick select buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                {[100000, 200000, 500000, 1000000].map(val => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => setDepositAmount(val.toString())}
-                    className="py-2 border border-slate-200 hover:border-[#22c55e] hover:bg-[#ecfdf5] rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                <div className="flex gap-3">
+                  <div className="flex-1 relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <span className="text-slate-400 group-focus-within:text-brand-500 transition-colors font-medium">₫</span>
+                    </div>
+                    <input 
+                      type="number" 
+                      min="10000"
+                      step="10000"
+                      required
+                      placeholder="Nhập số tiền khác..."
+                      className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all focus:bg-white"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    disabled={isSubmittingWallet}
+                    className={`px-5 py-3 rounded-xl text-sm font-bold text-white transition-all shadow-md shadow-brand-500/20 flex items-center gap-2 shrink-0
+                      ${isSubmittingWallet ? 'bg-brand-400 cursor-not-allowed' : 'bg-gradient-to-r from-brand-500 to-indigo-500 hover:from-brand-600 hover:to-indigo-600 hover:shadow-lg hover:-translate-y-0.5'}`}
                   >
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val)}
+                    {isSubmittingWallet ? (
+                      <><i className="ph ph-spinner animate-spin text-lg"></i> Đang xử lý</>
+                    ) : (
+                      <><i className="ph-fill ph-check-circle text-lg"></i> Nạp Ngay</>
+                    )}
                   </button>
-                ))}
-              </div>
-              
-              <button 
-                onClick={async () => {
-                  if (!depositAmount || parseFloat(depositAmount) <= 0) {
-                    return alert('Vui lòng nhập số tiền nạp hợp lệ!');
-                  }
-                  try {
-                    setIsSubmittingWallet(true);
-                    await depositWallet(parseFloat(depositAmount));
-                    alert('🎉 Nạp tiền vào ví cá nhân thành công!');
-                    setShowDepositWalletModal(false);
-                    setDepositAmount('');
-                    fetchDashboard(currentUserInfo.id); // reload dashboard
-                  } catch (e) {
-                    alert('Nạp tiền thất bại: ' + (e.response?.data?.message || e.response?.data || e.message));
-                  } finally {
-                    setIsSubmittingWallet(false);
-                  }
-                }}
-                disabled={isSubmittingWallet || !depositAmount}
-                className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-3.5 rounded-xl transition-all shadow-sm shadow-[#22c55e]/30 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-              >
-                {isSubmittingWallet ? 'Đang xử lý...' : 'Xác nhận Nạp tiền'}
-              </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

@@ -50,6 +50,11 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
       return;
     }
     
+    if (!pendingTx.id) {
+      alert('Lỗi dữ liệu: Giao dịch này chưa có ID hợp lệ trên hệ thống. Vui lòng tải lại trang!');
+      return;
+    }
+    
     try {
       // Call actual backend API
       const token = localStorage.getItem('evshare_jwt_token');
@@ -59,7 +64,8 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
       });
       
       if (!response.ok) {
-        throw new Error('Thanh toán thất bại từ máy chủ!');
+        const errorText = await response.text();
+        throw new Error(errorText || 'Thanh toán thất bại từ máy chủ!');
       }
       
       const updated = transactions.map(t => {

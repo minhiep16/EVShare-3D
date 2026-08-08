@@ -486,6 +486,47 @@ const VehicleCheckin3D = () => {
               <><i className="ph ph-check-square-offset text-xl"></i> Hoàn tất {mode === 'CHECKIN' ? 'Nhận xe' : 'Giao xe'}</>
             )}
           </button>
+          
+          {mode === 'CHECKIN' && damages.length > 0 && (
+            <button 
+              onClick={async () => {
+                const title = prompt("Nhập tiêu đề sự cố:");
+                if (!title) return;
+                try {
+                  setSubmitting(true);
+                  const token = localStorage.getItem('evshare_jwt_token');
+                  const desc = damages.map(d => `- ${d.part} (${d.severity}): ${d.notes}`).join('\n');
+                  const imgUrl = prompt("Nhập link ảnh bằng chứng (nếu có):", "https://img.freepik.com/free-photo/car-crash-accident_1150-13725.jpg");
+                  const data = {
+                    vehicleId: selectedVehicleId,
+                    title: title,
+                    description: desc,
+                    priority: damages.some(d => d.severity === 'HEAVY') ? 'HIGH' : 'MEDIUM',
+                    imageUrl: imgUrl
+                  };
+                  
+                  const response = await fetch(`http://localhost:8080/api/disputes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                  });
+                  if(response.ok) {
+                    alert("Đã gửi Báo cáo sự cố lên Admin!");
+                  } else {
+                    alert("Gửi báo cáo thất bại");
+                  }
+                } catch(e) {
+                  alert("Lỗi mạng!");
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              disabled={submitting}
+              className="w-full mt-3 font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-red-500/20"
+            >
+              <i className="ph ph-warning-circle text-xl"></i> Báo cáo Tranh chấp / Sự cố
+            </button>
+          )}
         </div>
       </div>
       )}

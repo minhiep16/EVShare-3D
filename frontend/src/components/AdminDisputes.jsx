@@ -49,16 +49,19 @@ const AdminDisputes = () => {
   }, []);
 
   const handleResolveImmediately = async (dispute) => {
-    const choice = confirm(
+    const penaltyStr = prompt(
       `⚖️ BẮT ĐẦU PHÂN GIẢI VỤ VIỆC #${dispute.id}:\n"${dispute.title}"\n\n` +
-      `Bấm OK để phê duyệt phương án: Khấu trừ quỹ của bên có lỗi & bồi thường cho bên bị hại.\n` +
-      `Bấm CANCEL để đưa vụ việc vào trạng thái điều tra bổ sung.`
+      `Nhập số tiền phạt (VNĐ) để khấu trừ từ ví của người vi phạm.\n(Để trống hoặc nhập 0 nếu chỉ cảnh cáo)`
     );
 
-    if (choice) {
+    if (penaltyStr !== null) {
+      const penaltyAmount = parseFloat(penaltyStr) || 0;
+      
+      const accusedUserId = prompt(`Nhập ID của người vi phạm để trừ tiền (nếu có, ví dụ: 2):`, '2');
+
       try {
-        const resolution = 'Khấu trừ quỹ của bên có lỗi & bồi thường cho bên bị hại.';
-        await solveDispute(dispute.dbId, resolution);
+        const resolution = `Đã phân xử. Phạt ${new Intl.NumberFormat('vi-VN').format(penaltyAmount)} VNĐ.`;
+        await solveDispute(dispute.dbId, resolution, penaltyAmount, accusedUserId ? parseInt(accusedUserId) : null);
         
         // Move to resolved disputes
         const newResolved = {
@@ -73,13 +76,13 @@ const AdminDisputes = () => {
 
         setResolvedDisputes(prev => [newResolved, ...prev]);
         setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
-        alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id}!`);
+        alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id} và khấu trừ tiền phạt!`);
       } catch (err) {
         console.error("Failed to solve dispute", err);
         alert(`❌ Lỗi khi xử lý vụ việc #${dispute.id}.`);
       }
     } else {
-      alert(`🕵️ Vụ việc #${dispute.id} đã được chuyển sang bộ phận Điều tra & Xác minh vệ tinh.`);
+      alert(`🕵️ Đã hủy thao tác phân giải.`);
     }
   };
 

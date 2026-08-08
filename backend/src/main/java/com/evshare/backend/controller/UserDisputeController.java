@@ -43,6 +43,7 @@ public class UserDisputeController {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .priority(request.getPriority())
+                .imageUrl(request.getImageUrl())
                 .status("OPEN")
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -58,5 +59,6 @@ public class UserDisputeController {
         private String title;
         private String description;
         private String priority;
+        private String imageUrl;
     }
 }

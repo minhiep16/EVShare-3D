@@ -38,4 +38,9 @@ public class Dispute {
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    
+    private Double penaltyAmount;
+    
+    @Column(columnDefinition = "TEXT")
+    private String imageUrl;
 }

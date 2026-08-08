@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -225,9 +226,9 @@ public class AdminController {
                     .vehicle(vehicle)
                     .type("TRIP_FEE")
                     .categoryName("Phí sử dụng & Phụ phí")
-                    .amount(totalCost - deductedAmount)
+                    .amount(totalCost) // <-- Shows actual total cost in ledger
                     .date(request.getTimestamp() != null ? request.getTimestamp().toLocalDate() : java.time.LocalDate.now())
-                    .description(breakdown.trim() + (deductedAmount > 0 ? String.format(" (Đã trừ %,.0f VNĐ từ ví cá nhân)", deductedAmount) : ""))
+                    .description(breakdown.trim() + (deductedAmount > 0 ? String.format(" (Đã thanh toán %,.0f VNĐ từ ví cá nhân. Còn nợ: %,.0f VNĐ)", deductedAmount, totalCost - deductedAmount) : ""))
                     .status(transactionStatus)
                     .build();
             transactionRepository.save(tx);

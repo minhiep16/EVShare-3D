@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups, getAdminDisputes, getFinanceSummary, getPendingServices, solveDispute } from '../services/api';
+import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups, getAdminDisputes, getFinanceSummary, getPendingServices, solveDispute, getRevenueAnalytics, getVehicleAnalytics } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const AdminDashboard = () => {
@@ -14,19 +14,25 @@ const AdminDashboard = () => {
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [ownershipShare, setOwnershipShare] = useState('');
 
+  // Analytics states
+  const [revenueData, setRevenueData] = useState([]);
+  const [vehicleData, setVehicleData] = useState([]);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [users, vehs, groups, disps, fin, srv] = await Promise.all([
+      const [users, vehs, groups, disps, fin, srv, revData, vehData] = await Promise.all([
         getUnassignedUsers(),
         getAllVehicles(),
         getVehicleGroups(),
         getAdminDisputes(),
         getFinanceSummary(),
-        getPendingServices()
+        getPendingServices(),
+        getRevenueAnalytics(),
+        getVehicleAnalytics()
       ]);
       setUnassignedUsers(users);
       setVehicles(vehs);
@@ -34,6 +40,19 @@ const AdminDashboard = () => {
       setDisputes(disps || []);
       setFinanceSummary(fin);
       setPendingServices(srv || []);
+      
+      // format backend data for charts
+      if (revData) {
+        setRevenueData(revData.map(d => ({
+          name: d.name,
+          doanhThu: d.revenue / 1000000,
+          chiPhi: d.maintenance / 1000000
+        })));
+      }
+      
+      if (vehData) {
+        setVehicleData(vehData);
+      }
     } catch (err) {
       console.error('Failed to fetch admin data', err);
     }
@@ -75,23 +94,6 @@ const AdminDashboard = () => {
   
   const totalIn = financeSummary?.totalIn || 0;
   const totalOut = financeSummary?.totalOut || 0;
-  
-  const revenueData = [
-    { name: 'T1', doanhThu: 0, chiPhi: 0 },
-    { name: 'T2', doanhThu: 0, chiPhi: 0 },
-    { name: 'T3', doanhThu: 0, chiPhi: 0 },
-    { name: 'T4', doanhThu: 0, chiPhi: 0 },
-    { name: 'T5', doanhThu: 0, chiPhi: 0 },
-    { name: 'Hiện tại', doanhThu: totalIn / 1000000, chiPhi: totalOut / 1000000 }
-  ];
-
-  const vehicleData = [
-    { name: 'Sẵn sàng', value: vehicles.filter(v => v.status === 'AVAILABLE').length, color: '#22c55e' },
-    { name: 'Đang dùng', value: vehicles.filter(v => v.status === 'IN_USE').length, color: '#3b82f6' },
-    { name: 'Bảo dưỡng', value: vehicles.filter(v => v.status === 'MAINTENANCE').length, color: '#f59e0b' },
-    { name: 'Sự cố', value: vehicles.filter(v => v.status === 'BROKEN').length, color: '#ef4444' }
-  ].filter(d => d.value > 0);
-  
   const totalVehicles = vehicles.length;
 
   const formatCurrency = (val) => {

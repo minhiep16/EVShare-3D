@@ -160,6 +160,13 @@ public class DashboardController {
         if (user == null || user.getVehicle() == null) {
             return ResponseEntity.badRequest().body("Bạn chưa có xe để đặt lịch.");
         }
+        
+        if (bookingRequest.getStartTime().isBefore(LocalDateTime.now())) {
+            return ResponseEntity.badRequest().body("Không thể đặt lịch vào thời gian trong quá khứ.");
+        }
+        if (bookingRequest.getEndTime().isBefore(bookingRequest.getStartTime()) || bookingRequest.getEndTime().isEqual(bookingRequest.getStartTime())) {
+            return ResponseEntity.badRequest().body("Thời gian kết thúc phải lớn hơn thời gian bắt đầu.");
+        }
 
         // 1. Lock the vehicle to prevent race conditions from other users booking the same vehicle
         Vehicle vehicle = vehicleRepository.findByIdWithLock(user.getVehicle().getId()).orElse(null);

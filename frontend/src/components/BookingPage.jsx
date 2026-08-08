@@ -76,6 +76,21 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
       const startDateTime = `${dateStr}T${startTime}:00`;
       const endDateTime = `${dateStr}T${endTime}:00`;
 
+      const startObj = new Date(startDateTime);
+      const endObj = new Date(endDateTime);
+
+      if (startObj < new Date()) {
+        alert("Không thể đặt lịch vào thời gian trong quá khứ!");
+        setLoading(false);
+        return;
+      }
+
+      if (endObj <= startObj) {
+        alert("Thời gian kết thúc phải lớn hơn thời gian bắt đầu!");
+        setLoading(false);
+        return;
+      }
+
       await onSubmitBooking({
         userId: currentUser?.id || 1,
         startTime: startDateTime,
@@ -387,7 +402,7 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-base font-semibold">Lịch sắp tới</h3>
             <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-md font-medium">
-              {bookings.length} chuyến
+              {bookings.filter(b => new Date(b.endTime) >= new Date()).length} chuyến
             </span>
           </div>
           
@@ -400,7 +415,10 @@ const BookingPage = ({ bookings, coOwners, currentUser, onSubmitBooking }) => {
           </button>
           
           <div className="space-y-3">
-            {bookings.sort((a,b) => new Date(b.startTime) - new Date(a.startTime)).slice(0,5).map((b) => {
+            {bookings
+              .filter(b => new Date(b.endTime) >= new Date())
+              .sort((a,b) => new Date(a.startTime) - new Date(b.startTime))
+              .slice(0,5).map((b) => {
               const start = new Date(b.startTime);
               const end = new Date(b.endTime);
               const isConfirmed = b.status === "CONFIRMED" || b.status === "PENDING";
