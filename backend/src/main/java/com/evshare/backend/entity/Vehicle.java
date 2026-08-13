@@ -26,9 +26,11 @@ public class Vehicle {
     private String imageUrl;
 
     // Architecture additions
+    @Builder.Default
     private Double jointFundBalance = 0.0;
 
     @Version
+    @Builder.Default
     private Integer version = 0;
 
     public enum VehicleStatus {

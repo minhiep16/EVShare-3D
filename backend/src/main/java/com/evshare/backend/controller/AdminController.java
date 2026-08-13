@@ -1,5 +1,6 @@
 package com.evshare.backend.controller;
 
+import java.util.Map;
 import com.evshare.backend.entity.User;
 import com.evshare.backend.entity.Vehicle;
 import com.evshare.backend.repository.UserRepository;
@@ -10,9 +11,6 @@ import com.evshare.backend.entity.Transaction;
 import com.evshare.backend.repository.TransactionRepository;
 import com.evshare.backend.entity.TripLog;
 import com.evshare.backend.repository.TripLogRepository;
-import com.evshare.backend.entity.ServiceRecord;
-import com.evshare.backend.repository.ServiceRecordRepository;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +29,6 @@ public class AdminController {
     private final CheckinLogRepository checkinLogRepository;
     private final TransactionRepository transactionRepository;
     private final TripLogRepository tripLogRepository;
-    private final ServiceRecordRepository serviceRecordRepository;
 
     @GetMapping("/users/unassigned")
     public ResponseEntity<List<User>> getUnassignedUsers() {
@@ -199,7 +196,8 @@ public class AdminController {
             if (heavyCount > 0) breakdown += String.format("Lỗi nặng x%d. ", heavyCount);
 
             // Deduct from user's personal wallet and add to vehicle's joint fund
-            double currentWallet = user.getWalletBalance() != null ? user.getWalletBalance() : 0.0;
+            Double walletBalance = user.getWalletBalance();
+            double currentWallet = walletBalance != null ? walletBalance : 0.0;
             double deductedAmount = 0.0;
             String transactionStatus = "PENDING";
 
@@ -214,7 +212,8 @@ public class AdminController {
             }
 
             if (deductedAmount > 0) {
-                double currentJointFund = vehicle.getJointFundBalance() != null ? vehicle.getJointFundBalance() : 0.0;
+                Double jointFundBalance = vehicle.getJointFundBalance();
+                double currentJointFund = jointFundBalance != null ? jointFundBalance : 0.0;
                 vehicle.setJointFundBalance(currentJointFund + deductedAmount);
             }
 

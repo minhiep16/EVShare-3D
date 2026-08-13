@@ -20,6 +20,7 @@ public class User {
     private Double ownershipPercentage;
     
     @Column(nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
     private Boolean isGroupLeader = false;
 
     // Credentials
@@ -41,6 +42,7 @@ public class User {
     private String gplxImageUrl;
 
     // Architecture additions
+    @Builder.Default
     private Double walletBalance = 0.0;
     
     @Column(name = "requested_vehicle_id")
@@ -57,9 +59,11 @@ public class User {
     }
 
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     private UserStatus status = UserStatus.PENDING_APPROVAL;
 
     @Version
+    @Builder.Default
     private Integer version = 0;
 
     public enum UserStatus {
