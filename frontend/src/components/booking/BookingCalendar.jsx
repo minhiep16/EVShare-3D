@@ -1,4 +1,5 @@
 import React from 'react';
+import Tilt3DCard from '../shared/Tilt3DCard';
 
 const BookingCalendar = ({ bookings, onSelectAll }) => {
   const now = new Date();
@@ -68,9 +69,10 @@ const BookingCalendar = ({ bookings, onSelectAll }) => {
     .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
 
   return (
-    <div className="xl:col-span-6 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-base font-semibold">Lịch đặt xe tháng {new Date().getMonth() + 1}</h3>
+    <Tilt3DCard className="xl:col-span-6 h-full">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 h-full flex flex-col transform-style-3d">
+        <div className="flex items-center justify-between mb-5" style={{ transform: 'translateZ(20px)' }}>
+          <h3 className="text-base font-semibold drop-shadow-sm">Lịch đặt xe tháng {new Date().getMonth() + 1}</h3>
         <button 
           onClick={onSelectAll}
           className="text-sm text-brand-600 font-medium hover:text-brand-500 cursor-pointer"
@@ -80,12 +82,12 @@ const BookingCalendar = ({ bookings, onSelectAll }) => {
       </div>
       
       {/* Calendar Header */}
-      <div className="grid grid-cols-7 gap-1.5 mb-6 text-center text-[11px] text-slate-400 font-medium">
+      <div className="grid grid-cols-7 gap-1.5 mb-6 text-center text-[11px] text-slate-400 font-medium" style={{ transform: 'translateZ(10px)' }}>
         <div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div><div>CN</div>
       </div>
       
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-7 gap-1.5" style={{ transform: 'translateZ(15px)' }}>
         {paddingDays.map(k => <div key={`pad-${k}`}></div>)}
         {displayDays.map((day) => {
           const booking = getBookingForDay(day);
@@ -109,8 +111,8 @@ const BookingCalendar = ({ bookings, onSelectAll }) => {
       </div>
 
       {/* Upcoming Bookings list */}
-      <div className="mt-6 pt-5 border-t border-slate-100">
-        <h4 className="text-sm font-semibold mb-3">Lịch đặt sắp tới</h4>
+      <div className="mt-6 pt-5 border-t border-slate-100 flex-1" style={{ transform: 'translateZ(25px)' }}>
+        <h4 className="text-sm font-semibold mb-3 drop-shadow-sm">Lịch đặt sắp tới</h4>
         {upcomingBookings.length === 0 ? (
           <div className="text-center text-sm text-slate-500 py-4">Chưa có lịch đặt sắp tới</div>
         ) : (
@@ -159,7 +161,8 @@ const BookingCalendar = ({ bookings, onSelectAll }) => {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </Tilt3DCard>
   );
 };
 

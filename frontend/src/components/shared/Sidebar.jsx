@@ -1,9 +1,9 @@
 import React from 'react';
 
-const Sidebar = ({ 
-  activeTab, 
-  setActiveTab, 
-  currentUser, 
+const Sidebar = ({
+  activeTab,
+  setActiveTab,
+  currentUser,
   notificationCount,
   currentRole,
   hasVehicle = true,
@@ -31,19 +31,34 @@ const Sidebar = ({
     { id: 'admin_checkin', label: 'Check-in / Check-out', icon: 'ph-qr-code' }
   ];
 
+  const [activeDisputes, setActiveDisputes] = React.useState(0);
+
+  React.useEffect(() => {
+    if (currentRole !== 'USER') {
+      import('../../services/api').then(({ getAdminDisputes }) => {
+        getAdminDisputes().then(disputes => {
+          if (disputes) {
+            const count = disputes.filter(d => d.status === 'PENDING').length;
+            setActiveDisputes(count);
+          }
+        }).catch(err => console.error(err));
+      });
+    }
+  }, [currentRole, activeTab]); // Re-fetch occasionally or when tab changes
+
   const adminManageItems = [
     { id: 'admin_services', label: 'Dịch vụ xe', icon: 'ph-wrench' },
-    { id: 'admin_disputes', label: 'Tranh chấp', icon: 'ph-scales', badge: 2 },
+    { id: 'admin_disputes', label: 'Tranh chấp', icon: 'ph-scales', badge: activeDisputes > 0 ? activeDisputes : null },
     { id: 'admin_finance', label: 'Báo cáo tài chính', icon: 'ph-chart-bar' },
-    { id: 'admin_staff', label: 'Quản lý Staff', icon: 'ph-users' }
+    // { id: 'admin_staff', label: 'Quản lý Staff', icon: 'ph-users' }
   ];
 
   const isUserMode = currentRole === 'USER';
-  const menuList = isUserMode 
-    ? (hasVehicle ? userMenuItems : userMenuItems.filter(item => item.id === 'dashboard')) 
+  const menuList = isUserMode
+    ? (hasVehicle ? userMenuItems : userMenuItems.filter(item => item.id === 'dashboard'))
     : adminMenuItems;
-  const manageList = isUserMode 
-    ? (hasVehicle ? userManageItems : []) 
+  const manageList = isUserMode
+    ? (hasVehicle ? userManageItems : [])
     : adminManageItems;
 
   return (
@@ -54,7 +69,7 @@ const Sidebar = ({
           <span className="text-brand-500">
             <i className="ph-fill ph-lightning text-2xl"></i>
           </span>
-          <span className="text-xl font-semibold tracking-tight">EVShare</span>
+          <span className="text-xl font-semibold tracking-tight">EVShare 3D</span>
         </div>
         {!isUserMode && (
           <span className="text-[9px] font-bold bg-violet-500 text-white px-1.5 py-0.5 rounded">ADMIN</span>
@@ -64,16 +79,15 @@ const Sidebar = ({
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         <p className="px-3 pb-2 text-[11px] uppercase tracking-wider text-slate-500 font-medium">Tổng quan</p>
-        
+
         {menuList.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left cursor-pointer ${
-              activeTab === item.id 
-                ? (isUserMode ? 'bg-brand-500 text-white font-semibold' : 'bg-violet-600 text-white font-semibold') 
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left cursor-pointer ${activeTab === item.id
+                ? (isUserMode ? 'bg-brand-500 text-white font-semibold' : 'bg-violet-600 text-white font-semibold')
                 : 'text-slate-300 hover:bg-white/5 hover:text-white'
-            }`}
+              }`}
           >
             <i className={`ph ${item.icon} text-lg`}></i>
             {item.label}
@@ -81,23 +95,26 @@ const Sidebar = ({
         ))}
 
         <p className="px-3 pt-5 pb-2 text-[11px] uppercase tracking-wider text-slate-500 font-medium">Quản lý</p>
-        
+
         {manageList.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left cursor-pointer ${
-              activeTab === item.id 
-                ? (isUserMode ? 'bg-brand-500 text-white font-semibold' : 'bg-violet-600 text-white font-semibold') 
+            className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left cursor-pointer ${activeTab === item.id
+                ? (isUserMode ? 'bg-brand-500 text-white font-semibold' : 'bg-violet-600 text-white font-semibold')
                 : 'text-slate-300 hover:bg-white/5 hover:text-white'
-            }`}
+              }`}
           >
             <div className="flex items-center gap-3">
               <i className={`ph ${item.icon} text-lg`}></i>
-              <span>{item.label}</span>
+              {item.label}
             </div>
             {item.badge && (
-              <span className="bg-red-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                activeTab === item.id 
+                  ? 'bg-white/20 text-white' 
+                  : (item.label === 'Tranh chấp' ? 'bg-red-500 text-white animate-pulse' : 'bg-brand-500/20 text-brand-400')
+              }`}>
                 {item.badge}
               </span>
             )}
@@ -108,10 +125,10 @@ const Sidebar = ({
       {/* Current User Info & Logout */}
       <div className="p-3 border-t border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <img 
-            src={currentUser?.avatarUrl} 
-            alt={currentUser?.name} 
-            className={`w-9 h-9 rounded-full object-cover ring-2 ${isUserMode ? 'ring-brand-500' : 'ring-violet-400'}`} 
+          <img
+            src={currentUser?.avatarUrl}
+            alt={currentUser?.name}
+            className={`w-9 h-9 rounded-full object-cover ring-2 ${isUserMode ? 'ring-brand-500' : 'ring-violet-400'}`}
           />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">{currentUser?.name}</p>
@@ -120,7 +137,7 @@ const Sidebar = ({
               {isUserMode && (
                 <span className="text-[11px] text-[#22c55e] font-bold flex items-center gap-1">
                   Ví: {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(currentUser?.walletBalance || 0)}
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       if (onDepositWalletClick) onDepositWalletClick();
@@ -135,7 +152,7 @@ const Sidebar = ({
             </div>
           </div>
         </div>
-        <button 
+        <button
           onClick={onLogout}
           className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           title="Đăng xuất"

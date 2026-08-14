@@ -20,4 +20,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         @Param("startTime") LocalDateTime startTime, 
         @Param("endTime") LocalDateTime endTime
     );
+
+    @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status != 'CANCELLED' AND b.startTime >= :startOfMonth AND b.endTime <= :endOfMonth")
+    List<Booking> findBookingsByUserInMonth(
+        @Param("userId") Long userId, 
+        @Param("startOfMonth") LocalDateTime startOfMonth, 
+        @Param("endOfMonth") LocalDateTime endOfMonth
+    );
 }

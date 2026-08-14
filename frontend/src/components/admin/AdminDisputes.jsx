@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { getAdminDisputes, solveDispute } from '../../services/api';
+import DigitalTwinDispute from '../3d-architecture/DigitalTwinDispute';
 
 const AdminDisputes = () => {
   const [activeDisputes, setActiveDisputes] = useState([]);
   const [resolvedDisputes, setResolvedDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDispute3D, setSelectedDispute3D] = useState(null);
 
   useEffect(() => {
     const fetchDisputes = async () => {
@@ -48,41 +50,35 @@ const AdminDisputes = () => {
     fetchDisputes();
   }, []);
 
-  const handleResolveImmediately = async (dispute) => {
-    const penaltyStr = prompt(
-      `⚖️ BẮT ĐẦU PHÂN GIẢI VỤ VIỆC #${dispute.id}:\n"${dispute.title}"\n\n` +
-      `Nhập số tiền phạt (VNĐ) để khấu trừ từ ví của người vi phạm.\n(Để trống hoặc nhập 0 nếu chỉ cảnh cáo)`
-    );
+  const handleResolveImmediately = (dispute) => {
+    setSelectedDispute3D(dispute);
+  };
 
-    if (penaltyStr !== null) {
-      const penaltyAmount = parseFloat(penaltyStr) || 0;
+  const submitResolution = async (dispute, penaltyStr, accusedUserIdStr) => {
+    const penaltyAmount = parseFloat(penaltyStr) || 0;
+    const accusedUserId = accusedUserIdStr ? parseInt(accusedUserIdStr) : null;
+
+    try {
+      const resolution = `Đã phân xử qua Digital Twin. Phạt ${new Intl.NumberFormat('vi-VN').format(penaltyAmount)} VNĐ.`;
+      await solveDispute(dispute.dbId, resolution, penaltyAmount, accusedUserId);
       
-      const accusedUserId = prompt(`Nhập ID của người vi phạm để trừ tiền (nếu có, ví dụ: 2):`, '2');
+      const newResolved = {
+        id: dispute.id,
+        title: dispute.title,
+        car: dispute.car,
+        result: resolution,
+        date: new Date().toLocaleDateString('vi-VN'),
+        staff: 'Admin EVShare',
+        avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
+      };
 
-      try {
-        const resolution = `Đã phân xử. Phạt ${new Intl.NumberFormat('vi-VN').format(penaltyAmount)} VNĐ.`;
-        await solveDispute(dispute.dbId, resolution, penaltyAmount, accusedUserId ? parseInt(accusedUserId) : null);
-        
-        // Move to resolved disputes
-        const newResolved = {
-          id: dispute.id,
-          title: dispute.title,
-          car: dispute.car,
-          result: resolution,
-          date: new Date().toLocaleDateString('vi-VN'),
-          staff: 'Admin EVShare',
-          avatar: 'https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-9.jpg'
-        };
-
-        setResolvedDisputes(prev => [newResolved, ...prev]);
-        setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
-        alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id} và khấu trừ tiền phạt!`);
-      } catch (err) {
-        console.error("Failed to solve dispute", err);
-        alert(`❌ Lỗi khi xử lý vụ việc #${dispute.id}.`);
-      }
-    } else {
-      alert(`🕵️ Đã hủy thao tác phân giải.`);
+      setResolvedDisputes(prev => [newResolved, ...prev]);
+      setActiveDisputes(prev => prev.filter(d => d.id !== dispute.id));
+      setSelectedDispute3D(null);
+      alert(`🎉 Đã giải quyết thành công vụ việc #${dispute.id} và khấu trừ tiền phạt!`);
+    } catch (err) {
+      console.error("Failed to solve dispute", err);
+      alert(`❌ Lỗi khi xử lý vụ việc #${dispute.id}.`);
     }
   };
 
@@ -256,13 +252,9 @@ const AdminDisputes = () => {
           );
         })}
 
-        {activeCount === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center">
-            <div className="w-16 h-16 bg-green-50 text-[#22c55e] rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-              <i className="ph ph-check-circle-fill"></i>
-            </div>
-            <h3 className="text-lg font-bold text-ink mb-1">Hoàn thành xuất sắc!</h3>
-            <p className="text-sm text-slate-500">Tất cả các vụ tranh chấp trong hệ thống đã được phân giải xong.</p>
+        {resolvedDisputes.length === 0 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-500">
+            Chưa có vụ việc nào được giải quyết.
           </div>
         )}
       </div>
@@ -312,6 +304,15 @@ const AdminDisputes = () => {
           </div>
         </div>
       </div>
+
+      {/* 3D Digital Twin Modal */}
+      {selectedDispute3D && (
+        <DigitalTwinDispute 
+          dispute={selectedDispute3D}
+          onClose={() => setSelectedDispute3D(null)}
+          onSolve={submitResolution}
+        />
+      )}
     </div>
   );
 };

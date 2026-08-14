@@ -159,11 +159,9 @@ const LoginPage = ({ onLoginSuccess }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-[#0b0f19]/95 via-[#0b0f19]/70 to-[#15803d]/40"></div>
         
         <div className="relative z-10 px-12 max-w-lg">
-          <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-3 inline-flex items-center gap-2 mb-8">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#22c55e" />
-            </svg>
-            <span className="text-white font-semibold tracking-wide text-sm">EVShare</span>
+          <div className="absolute top-8 left-8 flex items-center gap-2">
+            <span className="text-brand-500"><i className="ph-fill ph-lightning text-xl"></i></span>
+            <span className="text-white font-semibold tracking-wide text-sm">EVShare 3D</span>
           </div>
           
           <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-5">
@@ -197,11 +195,9 @@ const LoginPage = ({ onLoginSuccess }) => {
         <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-100 px-8 py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center text-white">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" />
-              </svg>
+              <i className="ph-fill ph-lightning text-lg"></i>
             </div>
-            <span className="font-bold text-slate-800 tracking-tight">EVShare</span>
+            <span className="font-bold text-slate-800 tracking-tight">EVShare 3D</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium">

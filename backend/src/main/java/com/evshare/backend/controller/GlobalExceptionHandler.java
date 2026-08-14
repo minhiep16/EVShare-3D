@@ -3,18 +3,14 @@ package com.evshare.backend.controller;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<String> handleException(Exception ex) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        ex.printStackTrace(pw);
-        System.err.println("Exception caught: " + sw.toString());
-        return ResponseEntity.status(500).body(ex.getMessage() + "\n" + sw.toString());
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<?> handleMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        System.err.println("URL that caused MethodArgumentTypeMismatchException: " + request.getRequestURI());
+        return ResponseEntity.badRequest().body("Invalid ID format");
     }
 }

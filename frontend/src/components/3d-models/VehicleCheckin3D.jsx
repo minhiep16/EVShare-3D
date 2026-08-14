@@ -1,7 +1,9 @@
-import React, { useRef, useState, useEffect, Suspense } from 'react';
+import React, { useRef, useState, useEffect, Suspense, memo } from 'react';
+import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Box, Environment, ContactShadows, Text, Html, useProgress } from '@react-three/drei';
 import { getVehicleGroups, checkoutVehicle, checkinVehicle, getAdminCheckinLogs } from '../../services/api';
+import CarModel3D from '../3d-architecture/CarModel3D';
 
 const Loader = () => {
   const { progress } = useProgress();
@@ -15,73 +17,228 @@ const Loader = () => {
   );
 };
 
-const CarModel = ({ onClickPart }) => {
-  return (
-    <group>
-      {/* Main Body */}
-      <Box 
-        args={[2, 0.8, 4.5]} 
-        position={[0, 0.6, 0]} 
-        castShadow 
-        onClick={(e) => { e.stopPropagation(); onClickPart('Thân xe (Cánh cửa/Sườn xe)'); }}
-        onPointerOver={(e) => { document.body.style.cursor = 'pointer'; }}
-        onPointerOut={(e) => { document.body.style.cursor = 'auto'; }}
-      >
-        <meshStandardMaterial color="#0f172a" roughness={0.2} metalness={0.8} />
-      </Box>
-
-      {/* Cabin/Roof */}
-      <Box 
-        args={[1.8, 0.6, 2.2]} 
-        position={[0, 1.3, -0.2]} 
-        castShadow
-        onClick={(e) => { e.stopPropagation(); onClickPart('Nóc xe / Kính lái'); }}
-        onPointerOver={(e) => { document.body.style.cursor = 'pointer'; }}
-        onPointerOut={(e) => { document.body.style.cursor = 'auto'; }}
-      >
-        <meshStandardMaterial color="#000000" roughness={0.1} metalness={0.9} transparent opacity={0.8} />
-      </Box>
-
-      {/* Wheels */}
-      {[
-        [-1.1, 0.3, 1.5], [1.1, 0.3, 1.5], 
-        [-1.1, 0.3, -1.5], [1.1, 0.3, -1.5]
-      ].map((pos, idx) => (
-        <mesh 
-          key={idx} 
-          position={pos} 
-          rotation={[Math.PI / 2, 0, 0]} 
-          castShadow
-          onClick={(e) => { e.stopPropagation(); onClickPart(`Bánh xe ${idx + 1}`); }}
-          onPointerOver={(e) => { document.body.style.cursor = 'pointer'; }}
-          onPointerOut={(e) => { document.body.style.cursor = 'auto'; }}
-        >
-          <cylinderGeometry args={[0.3, 0.3, 0.2, 32]} />
-          <meshStandardMaterial color="#333333" roughness={0.9} />
-        </mesh>
-      ))}
-
-      <Text position={[0, 0.6, 2.3]} fontSize={0.2} color="white">EVShare</Text>
-    </group>
-  );
-};
-
-const VehicleCheckin3D = () => {
-  const [vehicles, setVehicles] = useState([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+// Extracted Hologram UI to prevent re-rendering the 3D Canvas on form input
+const CheckoutHologram = ({ vehicleObj, vehicleMembers, mode, activeTrips, onClose, onSubmit, selectedPart, onClearPart }) => {
   const [selectedUserId, setSelectedUserId] = useState('');
-  const [mode, setMode] = useState('CHECKIN'); // CHECKIN (Nhận xe) or CHECKOUT (Giao xe)
-  const [selectedPart, setSelectedPart] = useState(null);
-  const [damages, setDamages] = useState([]);
-  const [notes, setNotes] = useState('');
-  const [severity, setSeverity] = useState('LIGHT');
   const [battery, setBattery] = useState(100);
   const [odo, setOdo] = useState(0);
   const [timestamp, setTimestamp] = useState(() => {
     const tzOffset = new Date().getTimezoneOffset() * 60000;
     return new Date(Date.now() - tzOffset).toISOString().slice(0, 16);
   });
+  const [damages, setDamages] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [severity, setSeverity] = useState('LIGHT');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (vehicleObj) {
+      setBattery(vehicleObj.batteryPercentage || 100);
+      setOdo(vehicleObj.odometer || 0);
+      if (mode === 'CHECKIN') {
+        const trip = activeTrips.find(t => t.vehicleId.toString() === vehicleObj.id.toString());
+        if (trip && trip.userId) setSelectedUserId(trip.userId);
+        else if (vehicleMembers && vehicleMembers.length > 0) setSelectedUserId(vehicleMembers[0].id);
+      } else {
+        if (vehicleMembers && vehicleMembers.length > 0) setSelectedUserId(vehicleMembers[0].id);
+        else setSelectedUserId('');
+      }
+      setDamages([]);
+      setNotes('');
+      setSeverity('LIGHT');
+      onClearPart();
+    }
+  }, [vehicleObj, mode]);
+
+  const addDamage = () => {
+    if (selectedPart && notes) {
+      setDamages([...damages, { part: selectedPart, notes, severity, timestamp: new Date().toISOString() }]);
+      setNotes('');
+      setSeverity('LIGHT');
+      onClearPart();
+    }
+  };
+
+  const removeDamage = (index) => setDamages(damages.filter((_, i) => i !== index));
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    await onSubmit({ userId: selectedUserId, battery, odo, damages, timestamp });
+    setSubmitting(false);
+  };
+
+  const handleDispute = async () => {
+    const title = prompt("Nhập tiêu đề sự cố:");
+    if (!title) return;
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('evshare_jwt_token');
+      const desc = damages.map(d => `- ${d.part} (${d.severity}): ${d.notes}`).join('\n');
+      const imgUrl = prompt("Nhập link ảnh bằng chứng (nếu có):", "https://img.freepik.com/free-photo/car-crash-accident_1150-13725.jpg");
+      const data = {
+        vehicleId: vehicleObj.id,
+        title: title,
+        description: desc,
+        priority: damages.some(d => d.severity === 'HEAVY') ? 'HIGH' : 'MEDIUM',
+        imageUrl: imgUrl
+      };
+      
+      const response = await fetch(`http://localhost:8080/api/disputes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(data)
+      });
+      if(response.ok) {
+        alert("Đã gửi Báo cáo sự cố lên Admin!");
+      } else {
+        alert("Gửi báo cáo thất bại");
+      }
+    } catch(e) {
+      alert("Lỗi mạng!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="w-[420px] bg-slate-900/90 backdrop-blur-xl border border-white/20 rounded-2xl p-5 shadow-[0_0_50px_rgba(0,0,0,0.5)] text-white flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+      
+      <div className="flex items-center justify-between pb-3 border-b border-white/10">
+        <div>
+          <h3 className={`font-black text-xl flex items-center gap-2 ${mode === 'CHECKIN' ? 'text-brand-400' : 'text-blue-400'}`}>
+            <i className={mode === 'CHECKIN' ? 'ph-fill ph-sign-in' : 'ph-fill ph-sign-out'}></i> 
+            THỦ TỤC {mode === 'CHECKIN' ? 'NHẬN XE' : 'GIAO XE'}
+          </h3>
+          <p className="text-sm font-medium text-slate-300 mt-1">
+            {vehicleObj.licensePlate} - {vehicleObj.model}
+          </p>
+        </div>
+        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer">
+          <i className="ph ph-x"></i>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 mb-1">Thành viên {mode === 'CHECKIN' ? 'trả xe' : 'nhận xe'}</label>
+          <div className="relative">
+            <i className="ph ph-user text-slate-400 absolute left-3 top-2.5"></i>
+            <select 
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              disabled={mode === 'CHECKIN'}
+              className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:ring-2 focus:border-brand-500 disabled:bg-slate-800/50 disabled:text-slate-500"
+            >
+              {vehicleMembers.map(m => (
+                <option key={m.id} value={m.id}>{m.name || "Không rõ tên"}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Pin (%)</label>
+            <div className="relative">
+              <i className="ph ph-battery-full text-brand-400 absolute left-3 top-2.5"></i>
+              <input 
+                type="number" min="0" max="100" value={battery} onChange={(e) => setBattery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:ring-2 focus:border-brand-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">ODO (km)</label>
+            <div className="relative">
+              <i className="ph ph-speedometer text-blue-400 absolute left-3 top-2.5"></i>
+              <input 
+                type="number" value={odo} onChange={(e) => setOdo(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm font-bold text-white focus:outline-none focus:ring-2 focus:border-brand-500"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Damage Recorder */}
+      {selectedPart && (
+        <div className="bg-slate-800 border border-brand-500/30 p-4 rounded-xl shadow-inner animate-fade-in-up mt-2">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-brand-400 flex items-center gap-2 text-sm">
+              <i className="ph-fill ph-warning-circle"></i> Ghi nhận: {selectedPart}
+            </h3>
+            <button onClick={onClearPart} className="text-slate-400 hover:text-white"><i className="ph ph-x"></i></button>
+          </div>
+          
+          <textarea 
+            className="w-full border border-slate-700 bg-slate-900 rounded-lg p-2 text-xs focus:ring-1 focus:ring-brand-500 outline-none mb-2 placeholder-slate-500 text-white"
+            rows="2" placeholder="Mô tả xước/móp..." value={notes} onChange={(e) => setNotes(e.target.value)}
+          />
+          
+          <div className="flex gap-2">
+            <select
+              value={severity} onChange={(e) => setSeverity(e.target.value)}
+              className="flex-1 border border-slate-700 bg-slate-900 rounded-lg p-2 text-xs focus:ring-1 focus:ring-brand-500 outline-none text-white font-medium"
+            >
+              <option value="LIGHT">Nhẹ (+500k)</option>
+              <option value="MEDIUM">Vừa (+2Tr)</option>
+              <option value="HEAVY">Nặng (+5Tr)</option>
+            </select>
+            <button onClick={addDamage} disabled={!notes.trim()} className={`px-3 rounded-lg text-xs font-bold transition-all ${notes.trim() ? 'bg-brand-500 hover:bg-brand-600 text-white' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
+              Thêm
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Damages List */}
+      {damages.length > 0 && (
+        <div className="bg-slate-800/50 rounded-xl p-3 border border-white/5 max-h-[150px] overflow-y-auto">
+          <h4 className="text-xs font-bold text-slate-300 mb-2">Tình trạng ghi nhận ({damages.length})</h4>
+          <div className="space-y-2">
+            {damages.map((dmg, idx) => (
+              <div key={idx} className="bg-slate-900/80 p-2 rounded-lg relative group text-xs border border-white/5">
+                <button onClick={() => removeDamage(idx)} className="absolute top-2 right-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><i className="ph-fill ph-trash"></i></button>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-bold text-white">{dmg.part}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${dmg.severity === 'HEAVY' ? 'bg-red-500/20 text-red-400' : (dmg.severity === 'MEDIUM' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-300')}`}>{dmg.severity}</span>
+                </div>
+                <p className="text-slate-400">{dmg.notes}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button 
+        onClick={handleConfirm} disabled={submitting}
+        className={`w-full font-bold py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 mt-2 transition-all ${
+          submitting ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 
+          mode === 'CHECKIN' ? 'bg-brand-500 hover:bg-brand-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
+        }`}
+      >
+        {submitting ? <><i className="ph ph-spinner animate-spin"></i> Xử lý...</> : <><i className="ph ph-check-circle text-lg"></i> XÁC NHẬN {mode === 'CHECKIN' ? 'NHẬN XE' : 'GIAO XE'}</>}
+      </button>
+
+      {mode === 'CHECKIN' && damages.length > 0 && (
+        <button 
+          onClick={handleDispute}
+          disabled={submitting}
+          className="w-full mt-1 font-bold py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-red-500/20 text-sm"
+        >
+          <i className="ph ph-warning-circle text-lg"></i> Báo cáo Sự cố
+        </button>
+      )}
+
+    </div>
+  );
+};
+
+const VehicleCheckin3D = () => {
+  const [vehicles, setVehicles] = useState([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [mode, setMode] = useState('CHECKIN'); 
+  const [selectedPart, setSelectedPart] = useState(null);
   const [historyLogs, setHistoryLogs] = useState([]);
   const [activeTrips, setActiveTrips] = useState([]);
 
@@ -108,32 +265,10 @@ const VehicleCheckin3D = () => {
     }
   };
 
-  const idleVehicles = vehicles.filter(v => !activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString()));
-  const runningVehicles = vehicles.filter(v => activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString()));
-
   const selectVehicleForMode = (vid, m) => {
     setMode(m);
     setSelectedVehicleId(vid);
-    const vData = vehicles.find(x => x.vehicle.id.toString() === vid.toString());
-    if (vData) {
-      setBattery(vData.vehicle.batteryPercentage);
-      setOdo(vData.vehicle.odometer);
-      
-      if (m === 'CHECKIN') {
-        const trip = activeTrips.find(t => t.vehicleId.toString() === vid.toString());
-        if (trip && trip.userId) {
-          setSelectedUserId(trip.userId);
-        } else if (vData.members && vData.members.length > 0) {
-          setSelectedUserId(vData.members[0].id);
-        }
-      } else {
-        if (vData.members && vData.members.length > 0) {
-          setSelectedUserId(vData.members[0].id);
-        } else {
-          setSelectedUserId('');
-        }
-      }
-    }
+    setSelectedPart(null);
   };
 
   const fetchHistory = async () => {
@@ -149,15 +284,6 @@ const VehicleCheckin3D = () => {
     try {
       const data = await getVehicleGroups();
       setVehicles(data);
-      if (data && data.length > 0) {
-        const firstVehicle = data[0].vehicle;
-        setSelectedVehicleId(firstVehicle.id);
-        if (data[0].members && data[0].members.length > 0) {
-          setSelectedUserId(data[0].members[0].id);
-        }
-        setBattery(firstVehicle.batteryPercentage);
-        setOdo(firstVehicle.odometer);
-      }
     } catch (err) {
       console.error("Failed to load vehicles:", err);
     }
@@ -167,60 +293,43 @@ const VehicleCheckin3D = () => {
     setSelectedPart(partName);
   };
 
-  const addDamage = () => {
-    if (selectedPart && notes) {
-      setDamages([...damages, { part: selectedPart, notes, severity, timestamp: new Date().toISOString() }]);
-      setNotes('');
-      setSeverity('LIGHT');
-      setSelectedPart(null);
-    }
-  };
-
-  const removeDamage = (index) => {
-    setDamages(damages.filter((_, i) => i !== index));
-  };
-
-  const selectedVehicleData = vehicles.find(v => v.vehicle.id.toString() === selectedVehicleId.toString());
-  const vehicleObj = selectedVehicleData?.vehicle;
-  const vehicleMembers = selectedVehicleData?.members || [];
-
-  const handleSubmit = async () => {
-    if (!selectedVehicleId || !selectedUserId) {
+  const handleSubmitHologram = async ({ userId, battery, odo, damages, timestamp }) => {
+    if (!selectedVehicleId || !userId) {
       alert("Vui lòng chọn xe và người dùng!");
       return;
     }
 
-    setSubmitting(true);
     try {
       const payload = {
-        userId: selectedUserId,
+        userId: userId,
         batteryPercentage: battery,
         odometer: odo,
         damages: JSON.stringify(damages),
         timestamp: timestamp
       };
 
+      const vehicleData = vehicles.find(v => v.vehicle.id.toString() === selectedVehicleId.toString());
+      const vehicleObj = vehicleData?.vehicle || { model: 'Xe', licensePlate: '---' };
+      const vehicleMembers = vehicleData?.members || [];
+
       if (mode === 'CHECKOUT') {
         const isRunning = activeTrips.some(t => t.vehicleId.toString() === selectedVehicleId.toString());
         if (isRunning) {
           alert("Xe này đang được giao cho người khác. Không thể giao xe!");
-          setSubmitting(false);
           return;
         }
 
         await checkoutVehicle(selectedVehicleId, payload);
-        const userName = vehicleMembers.find(m => m.id.toString() === selectedUserId.toString())?.name || "Thành viên";
+        const userName = vehicleMembers.find(m => m.id.toString() === userId.toString())?.name || "Thành viên";
         
         let existing = [];
         try { existing = JSON.parse(localStorage.getItem('evshare_activeTrips') || '[]'); if (!Array.isArray(existing)) existing = []; } catch(e) {}
         
-        // Remove any existing trip for this vehicle just in case
         existing = existing.filter(t => t.vehicleId.toString() !== selectedVehicleId.toString());
-        
         existing.push({
           vehicleId: selectedVehicleId,
-          vehiclePlate: vehicleObj?.licensePlate || vehicleObj?.model,
-          userId: selectedUserId,
+          vehiclePlate: vehicleObj.licensePlate || vehicleObj.model,
+          userId: userId,
           userName: userName,
           startTime: timestamp
         });
@@ -228,7 +337,7 @@ const VehicleCheckin3D = () => {
         localStorage.setItem('evshare_activeTrips', JSON.stringify(existing));
         window.dispatchEvent(new Event('evshare_trip_update'));
         
-        alert(`Đã hoàn tất Giao xe (Check-out) thành công!\nXe: ${vehicleObj?.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười nhận: ${userName}`);
+        alert(`Đã hoàn tất Giao xe (Check-out) thành công!\nXe: ${vehicleObj.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười nhận: ${userName}`);
       } else {
         const res = await checkinVehicle(selectedVehicleId, payload);
         const cost = res.cost || 0;
@@ -240,22 +349,20 @@ const VehicleCheckin3D = () => {
         localStorage.setItem('evshare_activeTrips', JSON.stringify(filtered));
         window.dispatchEvent(new Event('evshare_trip_update'));
         
-        alert(`Đã hoàn tất Nhận xe (Check-in) thành công!\nXe: ${vehicleObj?.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười trả: ${vehicleMembers.find(m => m.id.toString() === selectedUserId.toString())?.name}\n\nChi phí phát sinh (nếu có): ${cost.toLocaleString()} VNĐ`);
+        alert(`Đã hoàn tất Nhận xe (Check-in) thành công!\nXe: ${vehicleObj.licensePlate}\nPin: ${battery}%\nODO: ${odo} km\nNgười trả: ${vehicleMembers.find(m => m.id.toString() === userId.toString())?.name}\n\nChi phí phát sinh (nếu có): ${cost.toLocaleString()} VNĐ`);
       }
-      setDamages([]);
+      
+      setSelectedVehicleId('');
       fetchVehicles();
       fetchHistory();
     } catch (err) {
       console.error(err);
       alert(err.response?.data || "Đã xảy ra lỗi");
-    } finally {
-      setSubmitting(false);
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-full gap-6">
-      {/* 3D Viewer Area */}
+    <div className="flex flex-col h-full gap-4 relative">
       <div className="flex-1 flex flex-col gap-4">
         {/* Top bar */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
@@ -277,52 +384,6 @@ const VehicleCheckin3D = () => {
             >
               <i className="ph ph-clock-counter-clockwise mr-2"></i>Lịch sử
             </button>
-          </div>
-        </div>
-
-        {/* Vehicle Status Panel */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="font-bold text-sm text-slate-700 mb-3 uppercase tracking-wider">Trạng thái xe hiện tại</h3>
-          <div className="grid grid-cols-2 gap-4">
-            {/* Xe Trống */}
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-slate-500">XE TRỐNG (SẴN SÀNG GIAO)</span>
-                <span className="bg-white px-2 py-0.5 rounded-full text-xs font-bold text-slate-600 shadow-sm">{idleVehicles.length}</span>
-              </div>
-              <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                {idleVehicles.map(v => (
-                  <button key={v.vehicle.id} onClick={() => selectVehicleForMode(v.vehicle.id, 'CHECKOUT')} className="w-full text-left bg-white border border-slate-200 hover:border-brand-300 p-2 rounded-lg text-sm transition-colors flex justify-between items-center group">
-                    <span className="font-bold text-ink">{v.vehicle.licensePlate}</span>
-                    <i className="ph ph-sign-out text-slate-400 group-hover:text-brand-500"></i>
-                  </button>
-                ))}
-                {idleVehicles.length === 0 && <p className="text-xs text-slate-400 text-center py-2">Không có xe trống</p>}
-              </div>
-            </div>
-            
-            {/* Xe Đang Chạy */}
-            <div className="bg-brand-50 rounded-xl p-3 border border-brand-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-brand-700">ĐANG CHẠY (CHỜ NHẬN)</span>
-                <span className="bg-white px-2 py-0.5 rounded-full text-xs font-bold text-brand-600 shadow-sm">{runningVehicles.length}</span>
-              </div>
-              <div className="space-y-2 max-h-[150px] overflow-y-auto">
-                {runningVehicles.map(v => {
-                  const tripInfo = activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString());
-                  return (
-                    <button key={v.vehicle.id} onClick={() => selectVehicleForMode(v.vehicle.id, 'CHECKIN')} className="w-full text-left bg-white border border-brand-200 hover:border-brand-400 p-2 rounded-lg text-sm transition-colors flex justify-between items-center group shadow-sm shadow-brand-500/5">
-                      <div>
-                        <span className="font-bold text-brand-700 block">{v.vehicle.licensePlate}</span>
-                        <span className="text-[10px] text-brand-500/80 font-medium block">{tripInfo?.userName}</span>
-                      </div>
-                      <i className="ph ph-sign-in text-brand-400 group-hover:text-brand-600 text-lg"></i>
-                    </button>
-                  );
-                })}
-                {runningVehicles.length === 0 && <p className="text-xs text-brand-400/70 text-center py-2">Không có xe đang chạy</p>}
-              </div>
-            </div>
           </div>
         </div>
 
@@ -379,270 +440,91 @@ const VehicleCheckin3D = () => {
         ) : (
           <div className="flex-1 bg-slate-900 rounded-2xl overflow-hidden relative shadow-lg min-h-[450px]">
             <div className="absolute top-4 left-4 z-10">
-              <div className="bg-slate-800/80 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 text-white flex flex-col gap-1 shadow-2xl">
+              <div className="bg-slate-800/80 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 text-white flex flex-col gap-1 shadow-2xl pointer-events-none">
                 <h3 className="font-bold text-lg flex items-center gap-2">
                   <i className="ph-fill ph-cube text-brand-400"></i> Scanner 3D
                 </h3>
                 <p className="text-xs text-slate-300">Dùng chuột xoay, kéo, và click trực tiếp vào bộ phận xe để ghi nhận tình trạng.</p>
               </div>
             </div>
+
+            {/* Absolute Hologram Panel outside Canvas */}
+            {selectedVehicleId && (
+              <div className="absolute top-4 right-4 z-20 pointer-events-auto animate-fade-in-right">
+                {vehicles.find(v => v.vehicle.id.toString() === selectedVehicleId.toString()) && (
+                  <CheckoutHologram 
+                    vehicleObj={vehicles.find(v => v.vehicle.id.toString() === selectedVehicleId.toString()).vehicle}
+                    vehicleMembers={vehicles.find(v => v.vehicle.id.toString() === selectedVehicleId.toString()).members || []}
+                    mode={mode}
+                    activeTrips={activeTrips}
+                    selectedPart={selectedPart}
+                    onClearPart={() => setSelectedPart(null)}
+                    onClose={() => setSelectedVehicleId('')}
+                    onSubmit={handleSubmitHologram}
+                  />
+                )}
+              </div>
+            )}
             
-            <Canvas shadows camera={{ position: [5, 4, 6], fov: 45 }}>
+            <Canvas shadows camera={{ position: [5, 4, 6], fov: 45 }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
               <color attach="background" args={['#0f172a']} />
               <ambientLight intensity={0.5} />
               <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
               <Environment preset="city" />
               
               <Suspense fallback={<Loader />}>
-                <CarModel onClickPart={handlePartClick} />
-                <ContactShadows position={[0, 0, 0]} opacity={0.6} scale={12} blur={2.5} far={4} />
+                <group position={[0, -0.5, 0]}>
+                  {vehicles.map((v, i) => {
+                    const isRunning = activeTrips.find(t => t.vehicleId.toString() === v.vehicle.id.toString());
+                    const modeForCar = isRunning ? 'CHECKIN' : 'CHECKOUT';
+                    const isSelected = selectedVehicleId?.toString() === v.vehicle.id.toString();
+                    const xPos = (i - (vehicles.length - 1) / 2) * 5;
+                    
+                    return (
+                      <group key={v.vehicle.id} position={[xPos, 0, 0]}>
+                        {/* Floor Parking Slot Ring */}
+                        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+                          <ringGeometry args={[2.5, 2.8, 32]} />
+                          <meshBasicMaterial color={isRunning ? '#3b82f6' : '#22c55e'} transparent opacity={isSelected ? 0.8 : 0.3} side={THREE.DoubleSide} />
+                        </mesh>
+                        
+                        <CarModel3D 
+                           vehicle={v.vehicle} 
+                           onPartClick={(part) => {
+                             if (!isSelected) selectVehicleForMode(v.vehicle.id, modeForCar);
+                             else handlePartClick(part);
+                           }} 
+                           isShowroom={false} 
+                        />
+                        
+                        {/* Floating Hologram Label (Only when NOT selected) */}
+                        {!isSelected && (
+                          <Html position={[0, 3.2, 0]} center>
+                            <div 
+                              className={`px-3 py-2 rounded-xl text-xs font-bold text-white shadow-lg cursor-pointer whitespace-nowrap border-2 backdrop-blur-md transition-all hover:scale-105 ${isRunning ? 'bg-blue-600/80 border-blue-400' : 'bg-emerald-600/80 border-emerald-400'}`}
+                              onClick={() => selectVehicleForMode(v.vehicle.id, modeForCar)}
+                            >
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="text-sm font-black tracking-wider">{v.vehicle.licensePlate}</span>
+                                <span className="text-[10px] uppercase font-semibold text-white/90">
+                                  {isRunning ? 'CHỜ NHẬN XE' : 'SẴN SÀNG GIAO'}
+                                </span>
+                              </div>
+                            </div>
+                          </Html>
+                        )}
+                      </group>
+                    );
+                  })}
+                </group>
+                <ContactShadows position={[0, -0.49, 0]} opacity={0.6} scale={20} blur={2.5} far={4} />
               </Suspense>
               
-              <OrbitControls makeDefault autoRotate autoRotateSpeed={0.5} enablePan={false} maxPolarAngle={Math.PI/2 + 0.1}/>
+              <OrbitControls makeDefault enablePan={true} maxPolarAngle={Math.PI/2 - 0.05} minDistance={5} maxDistance={20}/>
             </Canvas>
           </div>
         )}
       </div>
-
-      {/* Control Panel - Only show if not HISTORY */}
-      {mode !== 'HISTORY' && (
-      <div className="w-full lg:w-96 flex flex-col gap-4">
-        
-        {/* Vehicle Stats Input */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="mb-5 pb-4 border-b border-slate-100">
-            <h3 className={`font-bold text-lg flex items-center gap-2 mb-2 ${mode === 'CHECKIN' ? 'text-brand-600' : 'text-blue-600'}`}>
-              <i className={mode === 'CHECKIN' ? 'ph-fill ph-sign-in' : 'ph-fill ph-sign-out'}></i> 
-              THỦ TỤC {mode === 'CHECKIN' ? 'NHẬN XE' : 'GIAO XE'}
-            </h3>
-            <p className="text-sm font-bold text-ink bg-slate-50 p-2 rounded-lg border border-slate-200 inline-block">
-              {vehicleObj?.licensePlate} - {vehicleObj?.model}
-            </p>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Thành viên {mode === 'CHECKIN' ? 'trả xe' : 'nhận xe'}</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i className="ph ph-user text-slate-400"></i>
-              </div>
-              <select 
-                value={selectedUserId}
-                onChange={(e) => setSelectedUserId(e.target.value)}
-                disabled={mode === 'CHECKIN'}
-                className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:border-brand-500 disabled:bg-slate-50 disabled:text-slate-500"
-              >
-                {vehicleMembers.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.name || "Không rõ tên"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          <h3 className="font-bold text-sm mb-3 flex items-center gap-2 text-slate-700 mt-5">
-            <i className="ph-fill ph-gauge text-slate-400"></i> Thông số kỹ thuật
-          </h3>
-          
-          <div className="mb-4">
-            <label className="block text-xs font-semibold text-slate-500 mb-1">Ngày giờ {mode === 'CHECKIN' ? 'Nhận xe' : 'Giao xe'}</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <i className="ph ph-calendar-blank text-brand-500"></i>
-              </div>
-              <input 
-                type="datetime-local" 
-                value={timestamp}
-                onChange={(e) => setTimestamp(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:border-brand-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Mức Pin (%)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="ph ph-battery-full text-brand-500"></i>
-                </div>
-                <input 
-                  type="number" 
-                  min="0" max="100"
-                  value={battery}
-                  onChange={(e) => setBattery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:border-brand-500"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1">Số ODO (km)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <i className="ph ph-speedometer text-blue-500"></i>
-                </div>
-                <input 
-                  type="number" 
-                  value={odo}
-                  onChange={(e) => setOdo(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-ink focus:outline-none focus:ring-2 focus:border-brand-500"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {selectedPart ? (
-          <div className="bg-brand-50 p-5 rounded-2xl shadow-sm border border-brand-200 animate-fade-in-up">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-brand-800 flex items-center gap-2">
-                <i className="ph-fill ph-warning-circle text-brand-600 text-lg"></i>
-                Ghi nhận tình trạng
-              </h3>
-              <button onClick={() => setSelectedPart(null)} className="text-brand-400 hover:text-brand-600">
-                <i className="ph ph-x font-bold"></i>
-              </button>
-            </div>
-            
-            <p className="text-sm font-bold text-white mb-4 bg-brand-600 px-3 py-1.5 rounded-lg inline-block shadow-sm shadow-brand-500/20">
-              {selectedPart}
-            </p>
-            
-            <label className="block text-xs font-semibold text-brand-700 mb-1">Mô tả chi tiết</label>
-            <textarea 
-              className="w-full border border-brand-200 bg-white rounded-lg p-3 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all mb-3 placeholder-brand-300"
-              rows="2"
-              placeholder="Vd: Trầy xước dài 5cm, móp nhẹ..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-            
-            <label className="block text-xs font-semibold text-brand-700 mb-1">Mức độ hư hỏng (Phụ phí)</label>
-            <select
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value)}
-              className="w-full border border-brand-200 bg-white rounded-lg p-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all mb-4 text-brand-800 font-medium"
-            >
-              <option value="LIGHT">Nhẹ (Trầy xước) + 500k</option>
-              <option value="MEDIUM">Vừa (Móp méo) + 2Tr</option>
-              <option value="HEAVY">Nặng (Vỡ/Hỏng) + 5Tr</option>
-            </select>
-            
-            <button 
-              onClick={addDamage}
-              disabled={!notes.trim()}
-              className={`w-full font-bold py-2.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 ${notes.trim() ? 'bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/30' : 'bg-brand-200 text-brand-400 cursor-not-allowed shadow-none'}`}
-            >
-              <i className="ph ph-plus-circle text-lg"></i> Thêm vào danh sách
-            </button>
-          </div>
-        ) : (
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 text-center flex flex-col items-center justify-center min-h-[120px] cursor-pointer hover:border-brand-300 transition-colors">
-            <div className="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center mb-2">
-              <i className="ph ph-hand-pointing text-xl"></i>
-            </div>
-            <p className="text-sm text-slate-500 font-medium">Click vào mô hình 3D để thêm tình trạng</p>
-          </div>
-        )}
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex-1 overflow-y-auto flex flex-col">
-          <h3 className="font-bold text-base mb-4 flex items-center justify-between">
-            Tình trạng xe
-            <span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold">{damages.length} mục</span>
-          </h3>
-          
-          <div className="flex-1">
-            {damages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-60">
-                <i className="ph ph-check-circle text-4xl text-green-500 mb-2"></i>
-                <p className="text-sm text-slate-500">Chưa ghi nhận vấn đề nào.</p>
-                <p className="text-xs text-slate-400">Tình trạng xe hoàn hảo</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {damages.map((dmg, idx) => (
-                  <div key={idx} className="bg-slate-50 border border-slate-200 p-3 rounded-xl relative group">
-                    <button 
-                      onClick={() => removeDamage(idx)}
-                      className="absolute top-3 right-3 text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <i className="ph-fill ph-trash"></i>
-                    </button>
-                    <div className="flex justify-between items-start mb-1">
-                      <p className="text-sm font-bold text-ink pr-6">{dmg.part}</p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 ${dmg.severity === 'HEAVY' ? 'bg-red-100 text-red-600' : (dmg.severity === 'MEDIUM' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600')}`}>
-                        {dmg.severity === 'HEAVY' ? 'Nặng' : (dmg.severity === 'MEDIUM' ? 'Vừa' : 'Nhẹ')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-600 bg-white p-2 rounded-lg border border-slate-100">
-                      {dmg.notes}
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-2 font-medium">{new Date(dmg.timestamp).toLocaleTimeString('vi-VN')} - {new Date(dmg.timestamp).toLocaleDateString('vi-VN')}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <button 
-            onClick={handleSubmit}
-            disabled={submitting}
-            className={`w-full mt-4 font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 ${
-              submitting ? 'bg-slate-400 cursor-not-allowed shadow-none' : 
-              mode === 'CHECKIN' ? 'bg-brand-500 hover:bg-brand-600 text-white shadow-brand-500/20' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20'
-            }`}
-          >
-            {submitting ? (
-              <><i className="ph ph-spinner animate-spin text-xl"></i> Đang xử lý...</>
-            ) : (
-              <><i className="ph ph-check-square-offset text-xl"></i> Hoàn tất {mode === 'CHECKIN' ? 'Nhận xe' : 'Giao xe'}</>
-            )}
-          </button>
-          
-          {mode === 'CHECKIN' && damages.length > 0 && (
-            <button 
-              onClick={async () => {
-                const title = prompt("Nhập tiêu đề sự cố:");
-                if (!title) return;
-                try {
-                  setSubmitting(true);
-                  const token = localStorage.getItem('evshare_jwt_token');
-                  const desc = damages.map(d => `- ${d.part} (${d.severity}): ${d.notes}`).join('\n');
-                  const imgUrl = prompt("Nhập link ảnh bằng chứng (nếu có):", "https://img.freepik.com/free-photo/car-crash-accident_1150-13725.jpg");
-                  const data = {
-                    vehicleId: selectedVehicleId,
-                    title: title,
-                    description: desc,
-                    priority: damages.some(d => d.severity === 'HEAVY') ? 'HIGH' : 'MEDIUM',
-                    imageUrl: imgUrl
-                  };
-                  
-                  const response = await fetch(`http://localhost:8080/api/disputes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(data)
-                  });
-                  if(response.ok) {
-                    alert("Đã gửi Báo cáo sự cố lên Admin!");
-                  } else {
-                    alert("Gửi báo cáo thất bại");
-                  }
-                } catch(e) {
-                  alert("Lỗi mạng!");
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              disabled={submitting}
-              className="w-full mt-3 font-bold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white shadow-red-500/20"
-            >
-              <i className="ph ph-warning-circle text-xl"></i> Báo cáo Tranh chấp / Sự cố
-            </button>
-          )}
-        </div>
-      </div>
-      )}
     </div>
   );
 };

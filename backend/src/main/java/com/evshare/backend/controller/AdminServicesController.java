@@ -81,7 +81,14 @@ public class AdminServicesController {
 
     @PostMapping("/templates")
     public ResponseEntity<ServiceTemplate> createTemplate(@RequestBody ServiceTemplate request) {
+        request.setIsActive(true);
         return ResponseEntity.ok(serviceTemplateRepository.save(request));
+    }
+
+    @DeleteMapping("/templates/{id}")
+    public ResponseEntity<?> deleteTemplate(@PathVariable Long id) {
+        serviceTemplateRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("message", "Đã xóa dịch vụ mẫu hoàn toàn"));
     }
 
     @PutMapping("/{id}")

@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { getUserCheckinLogs } from '../../services/api';
+import { getUserCheckinLogs, createDispute } from '../../services/api';
 
 const HistoryPage = ({ currentUser, bookings }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [period, setPeriod] = useState('month'); // month, quarter, year
   const [logs, setLogs] = useState([]);
+  
+  // Dispute state
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+  const [disputeTitle, setDisputeTitle] = useState('');
+  const [disputeDesc, setDisputeDesc] = useState('');
+  const [disputePriority, setDisputePriority] = useState('MEDIUM');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     fetchLogs();
@@ -17,6 +25,30 @@ const HistoryPage = ({ currentUser, bookings }) => {
       setLogs(data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleCreateDispute = async () => {
+    if (!disputeTitle || !disputeDesc) {
+      alert('Vui lòng nhập đầy đủ thông tin báo cáo.');
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await createDispute({
+        vehicleId: selectedVehicleId,
+        title: disputeTitle,
+        description: disputeDesc,
+        priority: disputePriority
+      });
+      alert('✅ Đã gửi báo cáo sự cố thành công!');
+      setIsDisputeModalOpen(false);
+      setDisputeTitle('');
+      setDisputeDesc('');
+    } catch (error) {
+      alert('❌ Lỗi khi gửi báo cáo: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -171,6 +203,7 @@ const HistoryPage = ({ currentUser, bookings }) => {
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Pin / ODO</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Tình trạng ghi nhận</th>
                 <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Chi phí phát sinh</th>
+                <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wide">Hành động</th>
               </tr>
             </thead>
             
@@ -206,6 +239,19 @@ const HistoryPage = ({ currentUser, bookings }) => {
                   <td className="py-3 px-3 font-medium text-red-500">
                     {t.cost > 0 ? formatCurrency(t.cost) : '-'}
                   </td>
+                  <td className="py-3 px-3">
+                    {t.type === 'CHECKIN' && (
+                      <button
+                        onClick={() => {
+                          setSelectedVehicleId(t.vehicle?.id || t.vehicleId);
+                          setIsDisputeModalOpen(true);
+                        }}
+                        className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer"
+                      >
+                        Báo cáo
+                      </button>
+                    )}
+                  </td>
                 </tr>
               )})}
 
@@ -234,6 +280,81 @@ const HistoryPage = ({ currentUser, bookings }) => {
           </div>
         </div>
       </div>
+
+      {/* Dispute Modal */}
+      {isDisputeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="text-lg font-bold text-ink">Báo cáo Sự cố</h3>
+                <button 
+                  onClick={() => setIsDisputeModalOpen(false)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors"
+                >
+                  <i className="ph ph-x"></i>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Loại sự cố</label>
+                  <select 
+                    value={disputeTitle}
+                    onChange={(e) => setDisputeTitle(e.target.value)}
+                    className="w-full text-sm border border-slate-200 rounded-xl px-4 py-2.5 outline-none focus:border-brand-500 bg-slate-50"
+                  >
+                    <option value="">-- Chọn sự cố --</option>
+                    <option value="Xe bị trầy xước/hư hỏng">Xe bị trầy xước / Hư hỏng</option>
+                    <option value="Xe không sạc đủ điện">Xe không sạc đủ điện</option>
+                    <option value="Vệ sinh xe kém">Vệ sinh xe kém</option>
+                    <option value="Khác">Khác</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Mô tả chi tiết</label>
+                  <textarea 
+                    value={disputeDesc}
+                    onChange={(e) => setDisputeDesc(e.target.value)}
+                    placeholder="Mô tả chi tiết tình trạng xe lúc nhận..."
+                    className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-brand-500 min-h-[100px] resize-y bg-slate-50"
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">Mức độ ưu tiên</label>
+                  <div className="flex gap-3">
+                    {['LOW', 'MEDIUM', 'HIGH'].map(p => (
+                      <label key={p} className={`flex-1 flex items-center justify-center gap-2 p-2 rounded-lg border cursor-pointer text-xs font-semibold transition-colors ${disputePriority === p ? (p === 'HIGH' ? 'border-red-500 bg-red-50 text-red-600' : p === 'MEDIUM' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-blue-500 bg-blue-50 text-blue-600') : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                        <input type="radio" name="priority" className="hidden" checked={disputePriority === p} onChange={() => setDisputePriority(p)} />
+                        {p === 'HIGH' ? 'Cao' : p === 'MEDIUM' ? 'Trung bình' : 'Thấp'}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button 
+                  onClick={() => setIsDisputeModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-sm transition-colors cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  onClick={handleCreateDispute}
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi Báo Cáo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

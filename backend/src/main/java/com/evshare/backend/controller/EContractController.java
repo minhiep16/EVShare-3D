@@ -58,17 +58,23 @@ public class EContractController {
 
             Font titleFont = new Font(Font.HELVETICA, 18, Font.BOLD);
             Font normalFont = new Font(Font.HELVETICA, 12, Font.NORMAL);
+            Font italicFont = new Font(Font.HELVETICA, 12, Font.ITALIC);
 
             Paragraph title = new Paragraph("HOP DONG DONG SO HUU XE DIEN", titleFont);
             title.setAlignment(Paragraph.ALIGN_CENTER);
             title.setSpacingAfter(20);
             document.add(title);
 
+            com.evshare.backend.entity.Vehicle vehicle = user.getVehicle();
+            String vehicleModel = vehicle != null ? vehicle.getModel() : "N/A";
+            String licensePlate = vehicle != null ? vehicle.getLicensePlate() : "N/A";
+
             document.add(new Paragraph("Ngay lap: " + LocalDate.now(), normalFont));
             document.add(new Paragraph("Ben A (Dai dien EVShare): Cong ty TNHH EVShare", normalFont));
             document.add(new Paragraph("Ben B (Dong so huu): " + (user.getName() != null ? user.getName() : "N/A"), normalFont));
             document.add(new Paragraph("CCCD/CMND: " + (user.getCccd() != null ? user.getCccd() : "N/A"), normalFont));
             document.add(new Paragraph("Email: " + (user.getEmail() != null ? user.getEmail() : "N/A"), normalFont));
+            document.add(new Paragraph("Thong tin xe: " + vehicleModel + " - BKS: " + licensePlate, normalFont));
             document.add(new Paragraph("Ty le so huu: " + (user.getOwnershipPercentage() != null ? user.getOwnershipPercentage() : 0.0) + "%", normalFont));
             
             document.add(new Paragraph("\nDieu khoan:", new Font(Font.HELVETICA, 14, Font.BOLD)));
@@ -77,13 +83,21 @@ public class EContractController {
             document.add(new Paragraph("3. Hop dong nay co gia tri phap ly tu ngay ky.", normalFont));
             
             document.add(new Paragraph("\nDai dien Ben A                                Dai dien Ben B", titleFont));
-            document.add(new Paragraph("(Da ky dien tu)                               " + (user.getName() != null ? user.getName() : ""), normalFont));
+            
+            if (user.getIsContractSigned() != null && user.getIsContractSigned()) {
+                document.add(new Paragraph("(Da ky dien tu)                               [DA KY DIEN TU VAO NGAY " + LocalDate.now() + "]", new Font(Font.HELVETICA, 12, Font.BOLD)));
+            } else {
+                document.add(new Paragraph("(Da ky dien tu)                               (Cho ky so)", italicFont));
+            }
+            
+            document.add(new Paragraph("                                              " + (user.getName() != null ? user.getName() : ""), normalFont));
 
             document.close();
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", "hop_dong_evshare_" + user.getId() + ".pdf");
+            String safeModelName = vehicleModel.toUpperCase().replaceAll("\\s+", "_");
+            headers.setContentDispositionFormData("attachment", "HD_DONG_SO_HUU_" + safeModelName + ".pdf");
 
             return new ResponseEntity<>(baos.toByteArray(), headers, HttpStatus.OK);
         } catch (Exception e) {

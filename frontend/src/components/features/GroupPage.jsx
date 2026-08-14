@@ -10,7 +10,8 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
   
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState(1000000);
-  const [depositMethod, setDepositMethod] = useState('VNPay');
+  const [depositMethod, setDepositMethod] = useState('EVShare Wallet');
+
   const [isDepositing, setIsDepositing] = useState(false);
   
   // Group Leader Modals
@@ -345,13 +346,26 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
                   >
                     {templates.map(t => (
                       <option key={t.id} value={t.id}>
-                        {t.name} - {formatCurrency(t.estimatedCost)}
+                        {t.name}
                       </option>
                     ))}
                   </select>
                 </div>
+                
+                {selectedTemplateId && (
+                  <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
+                    <p className="text-xs text-slate-500 mb-1">Thông tin dịch vụ:</p>
+                    <p className="text-sm font-semibold text-indigo-700 mb-1">
+                      {formatCurrency(templates.find(t => t.id.toString() === selectedTemplateId)?.estimatedCost || 0)}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {templates.find(t => t.id.toString() === selectedTemplateId)?.description || 'Không có mô tả'}
+                    </p>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Lý do đề xuất</label>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">Lý do đề xuất (Tùy chọn)</label>
                   <textarea 
                     value={proposeReason}
                     onChange={e => setProposeReason(e.target.value)}
@@ -557,6 +571,7 @@ const GroupPage = ({ coOwners, activeVotes, currentUser, onVoteCast, onDepositSu
                 <label className="block text-xs font-semibold text-slate-700 mb-2">Phương thức thanh toán</label>
                 <div className="space-y-2">
                   {[
+                    { id: 'EVShare Wallet', name: `Ví EVShare (${(currentUser?.walletBalance || 0).toLocaleString('vi-VN')} ₫)`, icon: 'ph-wallet text-brand-500' },
                     { id: 'VNPay', name: 'Thanh toán qua VNPay', icon: 'ph-qr-code text-blue-500' },
                     { id: 'Momo', name: 'Ví điện tử Momo', icon: 'ph-wallet text-pink-500' },
                     { id: 'Bank Transfer', name: 'Chuyển khoản ngân hàng', icon: 'ph-bank text-indigo-500' }

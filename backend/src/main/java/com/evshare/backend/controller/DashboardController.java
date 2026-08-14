@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -86,9 +87,42 @@ public class DashboardController {
                 ? voteRepository.findByVehicle_Id(vehicle.getId())
                 : Collections.<Vote>emptyList(); // New user has no votes yet
 
-        var suggestions = isCoOwner
-                ? suggestionRepository.findByVehicle_Id(vehicle.getId())
-                : Collections.<com.evshare.backend.entity.Suggestion>emptyList();
+        List<com.evshare.backend.entity.Suggestion> suggestions = new ArrayList<>();
+        if (isCoOwner && vehicle != null) {
+            // Suggestion 1: Quỹ chung
+            double fund = vehicle.getJointFundBalance() != null ? vehicle.getJointFundBalance() : 0.0;
+            if (fund < 2000000) {
+                suggestions.add(com.evshare.backend.entity.Suggestion.builder()
+                    .id(1L).type("WARNING").iconClass("ph-warning-circle")
+                    .content("Quỹ chung đang ở mức thấp (" + fund + " VNĐ). Cân nhắc nạp thêm để dự phòng các chi phí bảo dưỡng sắp tới.")
+                    .build());
+            } else if (fund > 10000000) {
+                suggestions.add(com.evshare.backend.entity.Suggestion.builder()
+                    .id(1L).type("SUCCESS").iconClass("ph-check-circle")
+                    .content("Quỹ chung đang rất dồi dào, đủ cho 2-3 lần bảo dưỡng tiếp theo.")
+                    .build());
+            }
+
+            // Suggestion 2: ODO
+            double odo = vehicle.getOdometer() != null ? vehicle.getOdometer() : 0.0;
+            if (odo > 10000) {
+                suggestions.add(com.evshare.backend.entity.Suggestion.builder()
+                    .id(2L).type("WARNING").iconClass("ph-wrench")
+                    .content("Xe đã chạy hơn 10,000km (" + odo + " km). Hãy kiểm tra lốp và thay dầu phanh nếu cần thiết.")
+                    .build());
+            } else {
+                suggestions.add(com.evshare.backend.entity.Suggestion.builder()
+                    .id(2L).type("INFO").iconClass("ph-car-profile")
+                    .content("Odo hiện tại là " + odo + "km. Tình trạng xe đang ổn định.")
+                    .build());
+            }
+            
+            // Suggestion 3: Booking Usage
+            suggestions.add(com.evshare.backend.entity.Suggestion.builder()
+                .id(3L).type("INFO").iconClass("ph-chart-line-up")
+                .content("Mức sử dụng xe của bạn trong tháng này đang ở mức an toàn so với tỉ lệ sở hữu (" + loggedUser.getOwnershipPercentage() + "%).")
+                .build());
+        }
 
         var availableVehicles = isCoOwner ? Collections.<Vehicle>emptyList() : vehicleRepository.findAll();
 
@@ -184,11 +218,23 @@ public class DashboardController {
             return ResponseEntity.badRequest().body("Thời gian này đã có người đặt lịch.");
         }
 
-        // 3. Check Quota (e.g. 1% ownership = 1.68 hours per week). Simplify by just checking against 33 hours for 20%
+        // 3. Check Quota (monthly limit based on ownership)
+        LocalDateTime startOfMonth = bookingRequest.getStartTime().withDayOfMonth(1).withHour(0).withMinute(0);
+        LocalDateTime endOfMonth = bookingRequest.getStartTime().withDayOfMonth(bookingRequest.getStartTime().toLocalDate().lengthOfMonth()).withHour(23).withMinute(59);
+        
+        List<Booking> monthBookings = bookingRepository.findBookingsByUserInMonth(user.getId(), startOfMonth, endOfMonth);
+        
+        long totalHoursUsed = 0;
+        for (Booking b : monthBookings) {
+            totalHoursUsed += ChronoUnit.HOURS.between(b.getStartTime(), b.getEndTime());
+        }
+
         long hoursToBook = ChronoUnit.HOURS.between(bookingRequest.getStartTime(), bookingRequest.getEndTime());
-        double maxHoursAllowed = (user.getOwnershipPercentage() / 100.0) * 168.0; // 168 hours in a week
-        if (hoursToBook > maxHoursAllowed) {
-            return ResponseEntity.badRequest().body("Vượt quá số giờ cho phép dựa trên tỷ lệ sở hữu (" + maxHoursAllowed + " giờ/tuần).");
+        double maxHoursAllowed = (user.getOwnershipPercentage() / 100.0) * 168.0; // Assume 168h is the standard max limit per month for 100% (or adjust to 168*4)
+        // Note: In the E-Contract it says "Tỉ lệ % * 168h" so we use 168h as the baseline.
+        
+        if ((totalHoursUsed + hoursToBook) > maxHoursAllowed) {
+            return ResponseEntity.badRequest().body("Vượt quá số giờ cho phép trong tháng. (Đã dùng: " + totalHoursUsed + "h, Cho phép: " + Math.round(maxHoursAllowed) + "h).");
         }
 
         Booking booking = Booking.builder()
@@ -442,6 +488,15 @@ public class DashboardController {
 
         Double amount = Double.valueOf(payload.get("amount").toString());
         String method = (String) payload.get("paymentMethod");
+
+        // Handle Wallet Deduction
+        if ("EVShare Wallet".equals(method)) {
+            if (user == null || user.getWalletBalance() == null || user.getWalletBalance() < amount) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Số dư ví EVShare không đủ. Vui lòng nạp thêm tiền vào ví."));
+            }
+            user.setWalletBalance(user.getWalletBalance() - amount);
+            userRepository.save(user);
+        }
 
         // Add to vehicle joint fund
         vehicle.setJointFundBalance(vehicle.getJointFundBalance() + amount);

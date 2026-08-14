@@ -109,6 +109,7 @@ const Header = ({ currentUser, activeTab, coOwners, vehicle, onMenuToggle, onCre
             <input 
               type="text" 
               placeholder="Tìm biển số, loại dịch vụ..." 
+              onChange={(e) => document.dispatchEvent(new CustomEvent('searchServices', { detail: e.target.value }))}
               className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all text-ink"
             />
           </div>

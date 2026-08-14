@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getUnassignedUsers, getAllVehicles, addMemberToVehicle, getVehicleGroups, getAdminDisputes, getFinanceSummary, getPendingServices, solveDispute, getRevenueAnalytics, getVehicleAnalytics } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import Tilt3DCard from '../shared/Tilt3DCard';
+import Dashboard3DHero from '../3d-architecture/Dashboard3DHero';
 
 const AdminDashboard = () => {
   const [disputes, setDisputes] = useState([]);
@@ -104,56 +106,70 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      {/* Cốt lõi của Hệ thống: 3D Command Center */}
+      <Dashboard3DHero />
+
+      {/* Global Stats Row - 3D Floating UIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        
         {/* Active groups */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-[#ecfdf5] flex items-center justify-center text-[#22c55e]">
-              <i className="ph ph-cars text-xl"></i>
+        <Tilt3DCard maxTilt={15} scale={1.05} perspective={1000} className="rounded-2xl h-full">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-3" style={{ transform: 'translateZ(20px)' }}>
+              <div className="w-10 h-10 rounded-xl bg-[#ecfdf5] flex items-center justify-center text-[#22c55e]">
+                <i className="ph ph-cars text-xl"></i>
+              </div>
             </div>
+            <p className="text-3xl font-bold text-ink" style={{ transform: 'translateZ(30px)' }}>{vehicleGroups.length}</p>
+            <p className="text-xs text-slate-500 font-medium mt-0.5" style={{ transform: 'translateZ(10px)' }}>Nhóm xe hoạt động</p>
           </div>
-          <p className="text-3xl font-bold text-ink">{vehicleGroups.length}</p>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Nhóm xe đang hoạt động</p>
-        </div>
+        </Tilt3DCard>
 
         {/* Co owners */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
-              <i className="ph ph-users text-xl"></i>
+        <Tilt3DCard maxTilt={15} scale={1.05} perspective={1000} className="rounded-2xl h-full">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-3" style={{ transform: 'translateZ(20px)' }}>
+              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500">
+                <i className="ph ph-users text-xl"></i>
+              </div>
             </div>
+            <p className="text-3xl font-bold text-ink" style={{ transform: 'translateZ(30px)' }}>{totalCoOwners}</p>
+            <p className="text-xs text-slate-500 font-medium mt-0.5" style={{ transform: 'translateZ(10px)' }}>Tổng Co-owners</p>
           </div>
-          <p className="text-3xl font-bold text-ink">{totalCoOwners}</p>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Tổng Co-owners</p>
-        </div>
+        </Tilt3DCard>
 
         {/* Disputes */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
-              <i className="ph ph-scales text-xl"></i>
-            </div>
-            {activeDisputesCount > 0 ? (
-              <span className="text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-md">⚠️ {activeDisputesCount} mới</span>
-            ) : (
-              <span className="text-xs font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-md">Sạch sẽ</span>
+        <Tilt3DCard maxTilt={15} scale={1.05} perspective={1000} className="rounded-2xl h-full">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-full flex flex-col justify-center relative overflow-hidden">
+            {activeDisputesCount > 0 && (
+              <span className="absolute top-4 right-4 flex h-3 w-3" style={{ transform: 'translateZ(40px)' }}>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
             )}
+            <div className="flex items-center justify-between mb-3" style={{ transform: 'translateZ(20px)' }}>
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500">
+                <i className="ph ph-scales text-xl"></i>
+              </div>
+            </div>
+            <p className="text-3xl font-bold text-ink" style={{ transform: 'translateZ(30px)' }}>{activeDisputesCount}</p>
+            <p className="text-xs text-slate-500 font-medium mt-0.5" style={{ transform: 'translateZ(10px)' }}>Tranh chấp đang xử lý</p>
           </div>
-          <p className="text-3xl font-bold text-ink">{activeDisputesCount}</p>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Tranh chấp đang xử lý</p>
-        </div>
+        </Tilt3DCard>
 
         {/* Revenue */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-500">
-              <i className="ph ph-chart-line-up text-xl"></i>
+        <Tilt3DCard maxTilt={15} scale={1.05} perspective={1000} className="rounded-2xl h-full">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-3" style={{ transform: 'translateZ(20px)' }}>
+              <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-500">
+                <i className="ph ph-chart-line-up text-xl"></i>
+              </div>
             </div>
+            <p className="text-3xl font-bold text-ink" style={{ transform: 'translateZ(30px)' }}>{formatCurrency(totalIn)}</p>
+            <p className="text-xs text-slate-500 font-medium mt-0.5" style={{ transform: 'translateZ(10px)' }}>Tổng thu hệ thống</p>
           </div>
-          <p className="text-3xl font-bold text-ink">{formatCurrency(totalIn)}</p>
-          <p className="text-xs text-slate-500 font-medium mt-0.5">Tổng thu hệ thống</p>
-        </div>
+        </Tilt3DCard>
       </div>
 
       {/* Charts Row */}

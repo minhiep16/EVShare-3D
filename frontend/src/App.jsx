@@ -2,11 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/shared/Sidebar';
 import Header from './components/shared/Header';
 import ProfileModal from './components/shared/ProfileModal';
-import VehicleHero from './components/dashboard/VehicleHero';
-import KPICards from './components/dashboard/KPICards';
-import CostChart from './components/dashboard/CostChart';
-import CoOwners from './components/dashboard/CoOwners';
-import AISuggestions from './components/dashboard/AISuggestions';
+import UserDashboard3D from './components/dashboard/UserDashboard3D';
 import ActiveTripBanner from './components/dashboard/ActiveTripBanner';
 import BookingCalendar from './components/booking/BookingCalendar';
 import BookingPage from './components/booking/BookingPage';
@@ -53,7 +49,8 @@ function App() {
   const [unassignedUsers, setUnassignedUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [showProfile, setShowProfile] = useState(false);
+  
   // Deposit Wallet Modal State
   const [showDepositWalletModal, setShowDepositWalletModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState('');
@@ -92,9 +89,11 @@ function App() {
     fetchDashboard();
   };
 
-  const handleVoteClick = async (voteId) => {
+  const handleVoteClick = async (voteId, agree = true) => {
     try {
-      await castVote(voteId);
+      if (voteId) {
+        await castVote(voteId, agree);
+      }
       fetchDashboard();
     } catch (err) {
       console.error(err);
@@ -257,7 +256,7 @@ function App() {
             <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <span className="text-brand-500"><i className="ph-fill ph-lightning text-2xl"></i></span>
-                <span className="text-xl font-semibold tracking-tight text-white">EVShare</span>
+                <span className="text-xl font-semibold tracking-tight text-white">EVShare 3D</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
@@ -314,40 +313,20 @@ function App() {
               <>
                 {data?.vehicle ? (
                   <>
-                    {/* Row 1: Vehicle Hero */}
-                    <VehicleHero
+                    <UserDashboard3D
                       vehicle={data?.vehicle}
-                      coOwnersCount={data?.coOwners?.length || 3}
+                      kpi={data?.kpi}
+                      bookings={data?.bookings || []}
+                      transactions={data?.transactions || []}
+                      coOwners={data?.coOwners || []}
+                      activeVotes={data?.activeVotes || []}
+                      suggestions={data?.suggestions || []}
                       ownershipPercentage={ownershipPercentage}
                       onBookNow={() => setActiveTab('booking')}
+                      onSelectAllBookings={() => alert('Chi tiết toàn bộ lịch đặt xe sẽ được hiển thị!')}
+                      onVoteClick={handleVoteClick}
+                      onAIChatClick={handleAIChat}
                     />
-
-                    {/* Row 2: KPI statistics */}
-                    <KPICards kpi={data?.kpi} />
-
-                    {/* Row 3: Calendar Scheduler + Cost Chart */}
-                    <section className="grid grid-cols-1 xl:grid-cols-10 gap-6">
-                      <BookingCalendar
-                        bookings={data?.bookings || []}
-                        onSelectAll={() => alert('Chi tiết toàn bộ lịch đặt xe sẽ được hiển thị!')}
-                      />
-
-                      <CostChart transactions={data?.transactions || []} />
-                    </section>
-
-                    {/* Row 4: Owner Group + AI Suggestions */}
-                    <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <CoOwners
-                        coOwners={data?.coOwners || []}
-                        activeVotes={data?.activeVotes || []}
-                        onVoteClick={handleVoteClick}
-                      />
-
-                      <AISuggestions
-                        suggestions={data?.suggestions || []}
-                        onAIChatClick={handleAIChat}
-                      />
-                    </section>
                   </>
                 ) : (
                   <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm">

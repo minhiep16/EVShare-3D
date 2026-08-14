@@ -8,12 +8,26 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
   const isMember = members.some(m => m.id?.toString() === currentUser?.id?.toString());
   
   const [appendixSigned, setAppendixSigned] = useState(currentUser?.isContractSigned || false);
+  const [contractPdfUrl, setContractPdfUrl] = useState(null);
 
   React.useEffect(() => {
     setAppendixSigned(currentUser?.isContractSigned || false);
   }, [currentUser]);
 
   const [showViewer, setShowViewer] = useState(false);
+
+  const openViewer = async () => {
+    try {
+      setShowViewer(true);
+      const blob = await downloadContract();
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+      setContractPdfUrl(url);
+    } catch (error) {
+      console.error('Failed to load contract viewer', error);
+      alert('❌ Lỗi khi tải bản xem trước hợp đồng.');
+      setShowViewer(false);
+    }
+  };
 
   // Dynamic Dates
   const today = new Date();
@@ -56,7 +70,8 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `HopDong_EVShare_${currentUser?.id || 'User'}.pdf`);
+      const safeModelName = (currentVehicle?.model || 'XE').toUpperCase().replace(/\s+/g, '_');
+      link.setAttribute('download', `HD_DONG_SO_HUU_${safeModelName}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -114,7 +129,11 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                   <img src={member.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className="w-7 h-7 rounded-full object-cover" />
                   <div>
                     <p className="text-xs font-semibold">{member.name || member.username}</p>
-                    <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · {member.ownershipPercentage}%</p>
+                    {member.isContractSigned ? (
+                      <p className="text-[10px] text-[#22c55e] font-semibold">✓ Đã ký · {member.ownershipPercentage}%</p>
+                    ) : (
+                      <p className="text-[10px] text-amber-500 font-semibold">⏳ Chờ ký · {member.ownershipPercentage}%</p>
+                    )}
                   </div>
                 </div>
               )) : (
@@ -125,7 +144,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
 
           <div className="flex flex-wrap gap-3">
             <button 
-              onClick={() => setShowViewer(true)}
+              onClick={openViewer}
               className="inline-flex items-center gap-2 bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
             >
               <i className="ph ph-eye"></i>Xem hợp đồng
@@ -175,14 +194,12 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
                   {members.map((m, idx) => (
                     <div key={m.id} className="flex items-center gap-2">
                       <img src={m.avatarUrl || "https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-6.jpg"} className={`w-6 h-6 rounded-full object-cover ring-2 ${
-                        idx === 0 || (idx === 1 && appendixSigned) ? 'ring-[#22c55e]' : 
-                        idx === 1 ? 'ring-amber-400' : 'ring-slate-300'
+                        m.isContractSigned ? 'ring-[#22c55e]' : 'ring-amber-400'
                       }`} />
                       <span className={`text-[11px] font-semibold ${
-                        idx === 0 || (idx === 1 && appendixSigned) ? 'text-[#16a34a]' : 
-                        idx === 1 ? 'text-amber-600' : 'text-slate-400'
+                        m.isContractSigned ? 'text-[#16a34a]' : 'text-amber-600'
                       }`}>
-                        {idx === 0 || (idx === 1 && appendixSigned) ? '✓ Ký rồi' : idx === 1 ? '⏳ Chờ' : 'Chưa xem'}
+                        {m.isContractSigned ? '✓ Ký rồi' : '⏳ Chờ ký'}
                       </span>
                     </div>
                   ))}
@@ -190,7 +207,7 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
 
                 <div className="flex gap-2">
                   <button 
-                    onClick={() => setShowViewer(true)}
+                    onClick={openViewer}
                     className="text-xs border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 text-slate-600 font-medium transition-colors cursor-pointer"
                   >
                     <i className="ph ph-eye mr-1"></i>Xem
@@ -369,62 +386,40 @@ const ContractPage = ({ currentUser, vehicle, coOwners }) => {
 
       </div>
 
-      {/* Mock Contract Document Viewer Overlay */}
+      {/* Contract Document Viewer Overlay */}
       {showViewer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+          <div className="bg-white rounded-2xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl">
             <div className="h-14 border-b border-slate-100 px-6 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-ink text-base">HĐ_DONG_SO_HUU_{currentVehicle.model.toUpperCase().replace(/\s+/g, '_')}.pdf</h3>
               <button 
-                onClick={() => setShowViewer(false)}
+                onClick={() => {
+                  setShowViewer(false);
+                  if (contractPdfUrl) {
+                    URL.revokeObjectURL(contractPdfUrl);
+                    setContractPdfUrl(null);
+                  }
+                }}
                 className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-500 text-lg transition-colors cursor-pointer"
               >
                 <i className="ph ph-x"></i>
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 text-sm text-slate-600 bg-slate-50 select-none">
-              <div className="bg-white border border-slate-200 shadow-sm p-10 max-w-2xl mx-auto space-y-6 font-serif">
-                <h2 className="text-center font-bold text-lg text-slate-900 uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
-                <p className="text-center font-bold text-xs -mt-4">Độc lập - Tự do - Hạnh phúc</p>
-                <div className="w-40 h-[1.5px] bg-slate-400 mx-auto -mt-4"></div>
-                
-                <h3 className="text-center font-bold text-base text-slate-900 uppercase pt-4">HỢP ĐỒNG ĐỒNG SỞ HỮU XE Ô TÔ ĐIỆN</h3>
-                <p className="text-center text-xs text-slate-400 -mt-2">Số: {contractId}</p>
-                
-                <p className="indent-8 text-justify">
-                  Hôm nay, ngày {today.getDate().toString().padStart(2, '0')} tháng {(today.getMonth() + 1).toString().padStart(2, '0')} năm {today.getFullYear()}, tại TP. Hồ Chí Minh, chúng tôi gồm có các bên cùng tham gia ký hợp đồng đồng sở hữu tài sản chung xe ô tô điện hiệu {currentVehicle.model} dưới sự hỗ trợ điều hành quản lý của nền tảng EVShare:
-                </p>
-
-                <div className="space-y-1">
-                  {members.map((m, idx) => (
-                    <p key={m.id}><strong>Bên {String.fromCharCode(65 + idx)} (Thành viên góp vốn):</strong> Ông/Bà {m.name || m.username} - Sở hữu {m.ownershipPercentage}%.</p>
-                  ))}
+            <div className="flex-1 w-full bg-slate-100 overflow-hidden">
+              {contractPdfUrl ? (
+                <iframe src={contractPdfUrl} className="w-full h-full border-none" title="Contract PDF" />
+              ) : (
+                <div className="w-full h-full flex flex-col gap-3 items-center justify-center text-slate-400">
+                  <i className="ph ph-spinner animate-spin text-4xl"></i>
+                  <p>Đang tải tệp PDF...</p>
                 </div>
-
-                <div className="space-y-2">
-                  <p className="font-bold text-slate-900">ĐIỀU 1: TÀI SẢN ĐỒNG SỞ HỮU</p>
-                  <p className="indent-8 text-justify">Tài sản đồng sở hữu là xe ô tô điện, nhãn hiệu {currentVehicle.model}. Biển kiểm soát đăng ký: {currentVehicle.licensePlate}. Giá trị tài sản góp vốn mua xe bao gồm cả chi phí lắp đặt cổng sạc.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="font-bold text-slate-900">ĐIỀU 2: TỈ LỆ SỬ DỤNG VÀ CHI PHÍ</p>
-                  <p className="indent-8 text-justify">Các bên thống nhất phân bổ giờ đặt lịch và quãng đường di chuyển mỗi tháng tương ứng chính xác theo tỉ lệ sở hữu cổ phần của từng thành viên. Chi phí vận hành phát sinh tự chi trả. Chi phí cố định chia sẻ tương ứng với tỉ lệ {members.map(m => m.ownershipPercentage + '%').join(' - ')} đóng vào Quỹ chung định kỳ.</p>
-                </div>
-
-                <div className="pt-8 flex justify-around text-xs text-slate-500 font-sans italic flex-wrap gap-4">
-                  {members.map(m => (
-                    <div key={m.id} className="text-center">
-                      <p className="font-bold not-italic">Đã Ký eSign ✓</p>
-                      <p className="mt-1">{m.name || m.username}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="h-16 border-t border-slate-100 px-6 flex items-center justify-end gap-3 shrink-0">
               <button 
+
                 onClick={handleDownload}
                 className="bg-[#22c55e] hover:bg-[#16a34a] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer"
               >

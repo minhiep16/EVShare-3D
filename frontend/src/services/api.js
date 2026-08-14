@@ -164,6 +164,11 @@ export const getServiceTemplates = async () => {
   return response.data;
 };
 
+export const deleteServiceTemplate = async (id) => {
+  const response = await axios.delete(`${API_BASE_URL}/admin/services/templates/${id}`);
+  return response.data;
+};
+
 export const createServiceTemplate = async (templateData) => {
   const response = await axios.post(`${API_BASE_URL}/admin/services/templates`, templateData);
   return response.data;
