@@ -343,18 +343,34 @@ public class DashboardController {
                 vote.setDescription(vote.getTitle() + " – Đã thông qua (" + vote.getAgreedPercentage().intValue() + "/" + totalMembers + " đồng ý)");
                 vote.setStatus("CLOSED");
 
-                // Auto create Service Record if this is a service proposal
+                // Auto create or update Service Record if this is a service proposal
                 if (vote.getTitle().startsWith("Đề xuất: ")) {
                     String serviceName = vote.getTitle().substring("Đề xuất: ".length());
-                    ServiceRecord record = ServiceRecord.builder()
-                            .vehicle(vote.getVehicle())
-                            .serviceType(serviceName)
-                            .description(vote.getDescription())
-                            .status("PENDING")
-                            .cost(0.0) // Admin will finalize cost later
-                            .scheduledDate(java.time.LocalDateTime.now().plusDays(3))
-                            .build();
-                    serviceRecordRepository.save(record);
+                    
+                    // Check if there is an existing VOTING record created by Admin
+                    List<ServiceRecord> existingRecords = serviceRecordRepository.findByVehicleIdAndStatus(vote.getVehicle().getId(), "VOTING");
+                    ServiceRecord targetRecord = null;
+                    for (ServiceRecord r : existingRecords) {
+                        if (r.getServiceType().equals(serviceName)) {
+                            targetRecord = r;
+                            break;
+                        }
+                    }
+
+                    if (targetRecord != null) {
+                        targetRecord.setStatus("PENDING");
+                        serviceRecordRepository.save(targetRecord);
+                    } else {
+                        ServiceRecord record = ServiceRecord.builder()
+                                .vehicle(vote.getVehicle())
+                                .serviceType(serviceName)
+                                .description(vote.getDescription())
+                                .status("PENDING")
+                                .cost(0.0) // Admin will finalize cost later
+                                .scheduledDate(java.time.LocalDateTime.now().plusDays(3))
+                                .build();
+                        serviceRecordRepository.save(record);
+                    }
                 } else if (vote.getTitle().startsWith("Bầu nhóm trưởng: ")) {
                     Long leaderId = Long.parseLong(vote.getTitle().substring("Bầu nhóm trưởng: ".length()));
                     

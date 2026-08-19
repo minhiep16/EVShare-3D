@@ -9,8 +9,23 @@ const formatCurrency = (value) => {
 };
 
 const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
-  const [hovered, setHovered] = useState(false);
+  const [active, setActive] = useState(false);
   const group = useRef();
+
+  const handlePointerOver = (e) => {
+    e.stopPropagation();
+    document.body.style.cursor = 'pointer';
+  };
+
+  const handlePointerOut = (e) => {
+    e.stopPropagation();
+    document.body.style.cursor = 'auto';
+  };
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    setActive(!active);
+  };
 
   const handleStart = async (e) => {
     e.stopPropagation();
@@ -31,7 +46,10 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
   });
 
   const isPending = service.status === 'PENDING';
-  const ringColor = isPending ? '#f59e0b' : '#3b82f6'; // Amber for pending, Blue for in-progress
+  const isVoting = service.status === 'VOTING';
+  let ringColor = '#3b82f6'; // In progress
+  if (isPending) ringColor = '#f59e0b';
+  if (isVoting) ringColor = '#64748b'; // Gray for waiting vote
 
   // Mock vehicle object for CarModel3D
   const vehicleObj = {
@@ -43,8 +61,9 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
     <group 
       ref={group} 
       position={position}
-      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
-      onPointerOut={(e) => { e.stopPropagation(); setHovered(false); document.body.style.cursor = 'auto'; }}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
+      onClick={handleClick}
     >
       {/* 3D Car */}
       <CarModel3D vehicle={vehicleObj} isShowroom={false} />
@@ -52,7 +71,7 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
       {/* Hologram Base Ring */}
       <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[2.5, 2.7, 64]} />
-        <meshBasicMaterial color={ringColor} transparent opacity={hovered ? 0.8 : 0.3} />
+        <meshBasicMaterial color={ringColor} transparent opacity={active ? 0.8 : 0.3} />
       </mesh>
 
       {/* 3D Label Floating Above Car */}
@@ -60,17 +79,31 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
         {service.plate}
       </Text>
 
-      {/* Hologram UI Panel (Visible on Hover) */}
-      {hovered && (
+      {/* Hologram UI Panel (Visible on Click) */}
+      {active && (
         <Html position={[0, 1.5, 2]} center transform occlude distanceFactor={8} zIndexRange={[100, 0]}>
-          <div className="w-80 bg-slate-900/80 backdrop-blur-xl border border-white/20 p-5 rounded-2xl text-white shadow-[0_0_30px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-start mb-3">
+          <div 
+            className="w-80 bg-slate-900/80 backdrop-blur-xl border border-white/20 p-5 rounded-2xl text-white shadow-[0_0_30px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200 relative"
+          >
+            <button 
+              onClick={(e) => { e.stopPropagation(); setActive(false); }}
+              className="absolute top-3 right-3 text-slate-400 hover:text-white transition-colors rounded-full hover:bg-white/10 p-1"
+            >
+              <i className="ph ph-x text-base font-bold"></i>
+            </button>
+
+            <div className="flex justify-between items-start mb-3 pr-6">
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{service.type}</p>
                 <h3 className="font-bold text-lg leading-tight">{service.title}</h3>
               </div>
-              <span className={`px-2 py-1 text-[10px] font-bold rounded border ${isPending ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}>
-                {isPending ? 'Đang chờ' : 'Đang xử lý'}
+              <span className={`px-2 py-1 text-[10px] font-bold rounded border ${
+                isVoting ? 'bg-slate-500/20 text-slate-400 border-slate-500/30' :
+                isPending ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 
+
+                'bg-blue-500/20 text-blue-400 border-blue-500/30'
+              }`}>
+                {isVoting ? 'Chờ duyệt' : isPending ? 'Đang chờ' : 'Đang xử lý'}
               </span>
             </div>
             
@@ -92,6 +125,14 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
             </div>
             
             <div className="flex gap-2">
+              {isVoting && (
+                <button 
+                  disabled
+                  className="flex-1 bg-slate-600/50 text-slate-300 py-2.5 rounded-lg text-sm font-bold shadow-inner cursor-not-allowed"
+                >
+                  Đang chờ chủ xe duyệt...
+                </button>
+              )}
               {isPending && (
                 <button 
                   onClick={handleStart}
@@ -100,12 +141,12 @@ const ServiceBayCar = ({ service, position, onComplete, onRefresh }) => {
                   Bắt đầu xử lý
                 </button>
               )}
-              {!isPending && (
+              {!isPending && !isVoting && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); onComplete(service.id); }}
                   className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-bold transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] cursor-pointer"
                 >
-                  Hoàn thành
+                  Hoàn thành & Thu phí
                 </button>
               )}
             </div>

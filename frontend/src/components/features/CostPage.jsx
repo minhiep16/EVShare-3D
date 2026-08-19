@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import FinanceHologram3D from '../3d-architecture/FinanceHologram3D';
 
 const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) => {
   const [transactions, setTransactions] = useState(initialTransactions || []);
@@ -225,99 +226,8 @@ const CostPage = ({ transactions: initialTransactions, coOwners, currentUser }) 
       </div>
 
       {/* Charts + Breakdown */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        
-        {/* Bar chart */}
-        <div className="xl:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-base font-semibold">Chi phí theo tháng</h3>
-              <p className="text-xs text-slate-400 mt-0.5">6 tháng gần nhất</p>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-[#22c55e] inline-block"></span>Của bạn
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-3 h-1.5 rounded bg-slate-200 inline-block"></span>Tổng nhóm
-              </span>
-            </div>
-          </div>
-          
-          <div className="relative w-full h-[240px]">
-            <svg viewBox="0 0 600 240" className="w-full h-full">
-              <line x1="50" y1="30" x2="570" y2="30" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="80" x2="570" y2="80" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="130" x2="570" y2="130" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="180" x2="570" y2="180" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="50" y1="210" x2="570" y2="210" stroke="#cbd5e1" strokeWidth="1" />
-
-              <text x="40" y="34" textAnchor="end" className="text-[11px] fill-slate-400 font-medium">8M</text>
-              <text x="40" y="84" textAnchor="end" className="text-[11px] fill-slate-400 font-medium">6M</text>
-              <text x="40" y="134" textAnchor="end" className="text-[11px] fill-slate-400 font-medium">4M</text>
-              <text x="40" y="184" textAnchor="end" className="text-[11px] fill-slate-400 font-medium">2M</text>
-              <text x="40" y="214" textAnchor="end" className="text-[11px] fill-slate-400 font-medium">0</text>
-
-              <rect x="80" y="105" width="36" height="105" rx="4" className="fill-slate-200" />
-              <rect x="86" y="168" width="24" height="42" rx="4" className="fill-brand-500" />
-              <text x="98" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T1</text>
-              
-              <rect x="160" y="87.5" width="36" height="122.5" rx="4" className="fill-slate-200" />
-              <rect x="166" y="161" width="24" height="49" rx="4" className="fill-brand-500" />
-              <text x="178" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T2</text>
-              
-              <rect x="240" y="93.8" width="36" height="116.2" rx="4" className="fill-slate-200" />
-              <rect x="246" y="163" width="24" height="47" rx="4" className="fill-brand-500" />
-              <text x="258" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T3</text>
-              
-              <rect x="320" y="81.2" width="36" height="128.8" rx="4" className="fill-slate-200" />
-              <rect x="326" y="159" width="24" height="51" rx="4" className="fill-brand-500" />
-              <text x="338" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T4</text>
-              
-              <rect x="400" y="70" width="36" height="140" rx="4" className="fill-slate-200" />
-              <rect x="406" y="154" width="24" height="56" rx="4" className="fill-brand-500" />
-              <text x="418" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T5</text>
-              
-              <rect x="480" y="60.5" width="36" height="149.5" rx="4" className="fill-slate-200" />
-              <rect x="486" y="150" width="24" height="60" rx="4" className="fill-brand-500" />
-              <text x="498" y="228" textAnchor="middle" className="text-xs font-semibold fill-slate-400">T6</text>
-            </svg>
-          </div>
-        </div>
-
-        {/* Donut cost breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base font-semibold mb-1">Phân loại chi phí</h3>
-          </div>
-          
-          <div className="flex-1 flex items-center justify-center py-1">
-            <div className="relative w-44 h-44">
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e2e8f0" strokeWidth="3"/>
-                {svgCircles}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-lg font-bold tracking-tight">Tổng</p>
-                <p className="text-[10px] text-slate-400 font-medium">Phân chia</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-2 mt-3">
-            {donutData.length > 0 ? donutData.map(d => (
-              <div key={d.label} className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-slate-600">
-                  <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: d.color }}></span>
-                  {d.label}
-                </span>
-                <span className="font-semibold">{formatCurrency(d.value)}</span>
-              </div>
-            )) : (
-              <div className="text-center text-xs text-slate-400">Chưa có chi phí nào</div>
-            )}
-          </div>
-        </div>
+      <div className="w-full relative rounded-2xl overflow-hidden shadow-sm mt-6 mb-8 border border-slate-700 bg-slate-900">
+        <FinanceHologram3D type="donut" data={safeDonutData} title="Chi Phí Nhóm" />
       </div>
 
       {/* Transaction table + payment panel */}

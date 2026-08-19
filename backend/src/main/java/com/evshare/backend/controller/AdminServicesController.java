@@ -6,6 +6,8 @@ import com.evshare.backend.entity.Vehicle;
 import com.evshare.backend.repository.VehicleRepository;
 import com.evshare.backend.repository.ServiceRecordRepository;
 import com.evshare.backend.repository.ServiceTemplateRepository;
+import com.evshare.backend.repository.VoteRepository;
+import com.evshare.backend.entity.Vote;
 import lombok.RequiredArgsConstructor;
 import lombok.Data;
 import org.springframework.http.ResponseEntity;
@@ -33,22 +35,38 @@ public class AdminServicesController {
     private final FundTransactionRepository fundTransactionRepository;
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
+    private final VoteRepository voteRepository;
 
     @PostMapping("")
-    public ResponseEntity<ServiceRecord> createServiceRecord(@RequestBody ServiceRecordRequest request) {
+    public ResponseEntity<?> createServiceRecord(@RequestBody ServiceRecordRequest request) {
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new RuntimeException("Vehicle not found"));
 
+        int totalMembers = userRepository.countByVehicle_Id(vehicle.getId());
+
+        // Tạo ServiceRecord với trạng thái VOTING để hiển thị xe trong xưởng nhưng chưa được bắt đầu
         ServiceRecord record = ServiceRecord.builder()
                 .vehicle(vehicle)
                 .serviceType(request.getServiceType())
                 .description(request.getDescription())
                 .cost(request.getCost())
                 .scheduledDate(request.getScheduledDate())
-                .status("PENDING")
+                .status("VOTING")
                 .build();
+        serviceRecordRepository.save(record);
 
-        return ResponseEntity.ok(serviceRecordRepository.save(record));
+        // Tạo một Vote Đề xuất để Chủ xe biểu quyết
+        Vote vote = Vote.builder()
+                .vehicle(vehicle)
+                .title("Đề xuất: " + request.getServiceType())
+                .description("Chi phí dự kiến: " + request.getCost() + " VNĐ. Lý do: " + request.getDescription() + " (Đề xuất từ Admin)")
+                .agreedPercentage(0.0)
+                .totalPercentage((double) (totalMembers > 0 ? totalMembers : 1))
+                .status("OPEN")
+                .build();
+        voteRepository.save(vote);
+
+        return ResponseEntity.ok(record);
     }
 
     @Data
@@ -62,10 +80,12 @@ public class AdminServicesController {
 
     @GetMapping("/pending")
     public ResponseEntity<List<ServiceRecord>> getPendingServices() {
-        // Also fetch IN_PROGRESS so Admin can see them
+        // Fetch PENDING, IN_PROGRESS, and VOTING so Admin can see them all in the 3D Service Bay
         List<ServiceRecord> pending = serviceRecordRepository.findByStatus("PENDING");
         List<ServiceRecord> inProgress = serviceRecordRepository.findByStatus("IN_PROGRESS");
+        List<ServiceRecord> voting = serviceRecordRepository.findByStatus("VOTING");
         pending.addAll(inProgress);
+        pending.addAll(voting);
         return ResponseEntity.ok(pending);
     }
 

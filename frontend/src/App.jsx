@@ -57,9 +57,10 @@ function App() {
   const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
 
   const fetchDashboard = async (userId) => {
+    const uid = userId || currentUserInfo?.id || 1;
     try {
       setLoading(true);
-      const res = await getDashboardData(userId);
+      const res = await getDashboardData(uid);
       setData(res);
       setError(null);
     } catch (err) {
@@ -97,7 +98,7 @@ function App() {
       fetchDashboard();
     } catch (err) {
       console.error(err);
-      alert('Không thể thực hiện bỏ phiếu.');
+      alert('Lỗi: ' + (err || 'Không thể thực hiện bỏ phiếu.'));
     }
   };
 
@@ -301,6 +302,7 @@ function App() {
         <Header
           currentUser={currentUser}
           activeTab={activeTab}
+          vehicle={data?.vehicle || currentUser?.vehicle}
           onMenuToggle={() => setMobileMenuOpen(true)}
           onCreateVehicle={() => setIsCreateVehicleModalOpen(true)}
           onProfileClick={() => setIsProfileModalOpen(true)}
@@ -379,6 +381,7 @@ function App() {
                 activeVotes={data?.activeVotes || []}
                 currentUser={currentUser}
                 onVoteCast={handleVoteClick}
+                onDepositSuccess={() => fetchDashboard(currentUserInfo?.id || 1)}
               />
             )}
 

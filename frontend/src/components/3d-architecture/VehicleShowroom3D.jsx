@@ -80,7 +80,7 @@ const VehicleShowroom3D = ({ vehicles, onAddMember }) => {
             
             {/* 3D Interactive Spatial UI: Left Panel (Vehicle Stats) */}
             <Float speed={2} rotationIntensity={0.1} floatIntensity={0.5}>
-              <Html position={[-4.5, 2.5, 0]} transform rotation={[0, Math.PI / 8, 0]} distanceFactor={8} className="pointer-events-none">
+              <Html position={[-4.5, 2.5, 0]} transform rotation={[0, Math.PI / 8, 0]} distanceFactor={8} zIndexRange={[40, 0]} className="pointer-events-none">
                 <div className="w-[320px] bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] text-white pointer-events-auto">
                   <h2 className="text-3xl font-bold tracking-tight mb-3 drop-shadow-md">{vehicle.model || 'Unknown Model'}</h2>
                   <div className="flex items-center gap-2 mb-6">
@@ -121,7 +121,7 @@ const VehicleShowroom3D = ({ vehicles, onAddMember }) => {
 
             {/* 3D Interactive Spatial UI: Right Panel (Members) */}
             <Float speed={1.5} rotationIntensity={0.1} floatIntensity={0.3}>
-              <Html position={[4.5, 2.5, 0]} transform rotation={[0, -Math.PI / 8, 0]} distanceFactor={8} className="pointer-events-none">
+              <Html position={[4.5, 2.5, 0]} transform rotation={[0, -Math.PI / 8, 0]} distanceFactor={8} zIndexRange={[40, 0]} className="pointer-events-none">
                 <div className="w-[300px] bg-slate-900/80 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-[0_0_30px_rgba(0,0,0,0.5)] text-white pointer-events-auto">
                   <div className="mb-4">
                     <div className="flex items-center gap-2 text-slate-400 text-xs font-semibold tracking-wider uppercase mb-1">

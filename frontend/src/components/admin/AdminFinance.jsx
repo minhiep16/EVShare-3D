@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFinanceSummary, getVehicleFinanceStats } from '../../services/api';
+import FinanceHologram3D from '../3d-architecture/FinanceHologram3D';
 
 const AdminFinance = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,8 +52,25 @@ const AdminFinance = () => {
     g.plate.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const donutData = [
+    { label: 'VinFast', value: 45, color: '#22c55e' },
+    { label: 'Tesla', value: 30, color: '#3b82f6' },
+    { label: 'Hyundai', value: 15, color: '#f59e0b' },
+    { label: 'Khác', value: 10, color: '#94a3b8' }
+  ];
+
+  const barData = [
+    { label: 'Thứ 2', value: 45, color: '#3b82f6' },
+    { label: 'Thứ 3', value: 55, color: '#3b82f6' },
+    { label: 'Thứ 4', value: 85, color: '#22c55e' },
+    { label: 'Thứ 5', value: 70, color: '#22c55e' },
+    { label: 'Thứ 6', value: 92, color: '#22c55e' },
+    { label: 'Thứ 7', value: 100, color: '#22c55e' },
+    { label: 'CN', value: 65, color: '#f59e0b' }
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
       {/* Top Stats Rows */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* GMV */}
@@ -92,103 +110,10 @@ const AdminFinance = () => {
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Revenue Structure Donut */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
-          <h3 className="text-base font-bold text-ink mb-4">Cơ cấu doanh thu theo loại xe</h3>
-          <div className="flex-1 flex items-center justify-center py-6">
-            <div className="relative w-52 h-52">
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#e2e8f0" strokeWidth="4"/>
-                {/* VinFast: 45% (22c55e) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#22c55e" strokeWidth="4" strokeDasharray="45 55" strokeLinecap="round"/>
-                {/* Tesla: 30% (3b82f6) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#3b82f6" strokeWidth="4" strokeDasharray="30 70" strokeDashoffset="-45" strokeLinecap="round"/>
-                {/* Hyundai: 15% (f59e0b) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f59e0b" strokeWidth="4" strokeDasharray="15 85" strokeDashoffset="-75" strokeLinecap="round"/>
-                {/* Khác: 10% (94a3b8) */}
-                <circle cx="18" cy="18" r="15.915" fill="none" stroke="#94a3b8" strokeWidth="4" strokeDasharray="10 90" strokeDashoffset="-90" strokeLinecap="round"/>
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-xl font-bold tracking-tight text-ink">EVShare</p>
-                <p className="text-[9px] text-slate-400 font-bold uppercase">Cơ cấu</p>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 text-xs mt-4">
-            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#22c55e]"></span>VinFast</span>
-              <span className="font-bold text-ink">45%</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Tesla</span>
-              <span className="font-bold text-ink">30%</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400"></span>Hyundai</span>
-              <span className="font-bold text-ink">15%</span>
-            </div>
-            <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-400"></span>Khác</span>
-              <span className="font-bold text-ink">10%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Usage Frequency & System Performance */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-bold text-ink">Tần suất sử dụng & Hiệu suất nhóm</h3>
-            <div className="flex items-center gap-4 text-xs font-semibold">
-              <span className="text-[#cbd5e1]">-- Mục tiêu (70%)</span>
-              <span className="text-[#22c55e]">— Thực tế</span>
-            </div>
-          </div>
-          
-          <div className="relative w-full h-[220px] mt-4">
-            <svg viewBox="0 0 500 220" className="w-full h-full">
-              {/* Horizontal gridlines */}
-              <line x1="40" y1="30" x2="480" y2="30" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="40" y1="80" x2="480" y2="80" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="40" y1="130" x2="480" y2="130" stroke="#f1f5f9" strokeWidth="1" />
-              <line x1="40" y1="180" x2="480" y2="180" stroke="#cbd5e1" strokeWidth="1.5" />
-
-              {/* Y Axis Values */}
-              <text x="30" y="34" textAnchor="end" className="text-[9px] fill-slate-400 font-semibold">100%</text>
-              <text x="30" y="84" textAnchor="end" className="text-[9px] fill-slate-400 font-semibold">70%</text>
-              <text x="30" y="134" textAnchor="end" className="text-[9px] fill-slate-400 font-semibold">40%</text>
-              <text x="30" y="184" textAnchor="end" className="text-[9px] fill-slate-400 font-semibold">0%</text>
-
-              {/* X Axis Labels */}
-              <text x="40" y="202" textAnchor="start" className="text-[9px] fill-slate-400 font-semibold">Ngày 1</text>
-              <text x="260" y="202" textAnchor="middle" className="text-[9px] fill-slate-400 font-semibold">Ngày 15</text>
-              <text x="480" y="202" textAnchor="end" className="text-[9px] fill-slate-400 font-semibold">Ngày 30</text>
-
-              {/* Target Line (Dashed) */}
-              <line x1="40" y1="80" x2="480" y2="80" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="5 5" />
-
-              {/* Actual Line (SVG path) */}
-              {/* Plotting points dynamically */}
-              <path 
-                d="M 40,90 Q 76,70 112,95 T 184,80 T 256,65 T 328,105 T 400,60 T 480,72 L 480,180 L 40,180 Z"
-                fill="rgba(34,197,94,0.08)"
-              />
-              <path 
-                d="M 40,90 Q 76,70 112,95 T 184,80 T 256,65 T 328,105 T 400,60 T 480,72"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="2.5"
-              />
-
-              {/* Dots on line */}
-              <circle cx="112" cy="95" r="3" className="fill-[#22c55e]" />
-              <circle cx="256" cy="65" r="3" className="fill-[#22c55e]" />
-              <circle cx="400" cy="60" r="3" className="fill-[#22c55e]" />
-            </svg>
-          </div>
-          <p className="text-[11px] text-slate-400 text-center mt-3">Đồ thị thống kê tự động dựa trên 30 ngày hoạt động liên tục gần nhất</p>
-        </div>
+      {/* Hologram Charts Row */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 relative z-0">
+        <FinanceHologram3D type="donut" data={donutData} title="Cơ Cấu Nhãn Hiệu" />
+        <FinanceHologram3D type="bar" data={barData} title="Hiệu Suất (Tuần)" autoRotate={false} />
       </div>
 
       {/* Group Financials Table */}

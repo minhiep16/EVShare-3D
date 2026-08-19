@@ -52,9 +52,13 @@ export const simulateOcr = async (file) => {
   return response.data;
 };
 
-export const castVote = async (voteId, agree = true) => {
-  const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`);
-  return response.data;
+export const castVote = async (voteId, agree) => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`, { agree });
+    return response.data;
+  } catch (error) {
+    throw error.response?.data?.message || error.message;
+  }
 };
 
 export const login = async (username, password) => {
@@ -178,6 +182,11 @@ export const proposeServiceVote = async (vehicleId, data) => {
   const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/votes/propose-service`, data);
   return response.data;
 };
+
+
+
+
+
 
 export const proposeLeaderVote = async (vehicleId, leaderId) => {
   const response = await axios.post(`${API_BASE_URL}/vehicles/${vehicleId}/votes/propose-leader`, { leaderId: leaderId.toString() });
