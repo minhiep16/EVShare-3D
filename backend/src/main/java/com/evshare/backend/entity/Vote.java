@@ -34,7 +34,6 @@ public class Vote {
     @CollectionTable(name = "vote_voter_ids", joinColumns = @JoinColumn(name = "vote_id"))
     @Column(name = "user_id")
     @Builder.Default
-    @com.fasterxml.jackson.annotation.JsonIgnore
     private java.util.Set<Long> voterIds = new java.util.HashSet<>();
 
     @Builder.Default
@@ -44,6 +43,5 @@ public class Vote {
     @CollectionTable(name = "vote_rejecter_ids", joinColumns = @JoinColumn(name = "vote_id"))
     @Column(name = "user_id")
     @Builder.Default
-    @com.fasterxml.jackson.annotation.JsonIgnore
     private java.util.Set<Long> rejecterIds = new java.util.HashSet<>();
 }

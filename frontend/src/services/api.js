@@ -54,10 +54,13 @@ export const simulateOcr = async (file) => {
 
 export const castVote = async (voteId, agree) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`, { agree });
+    const response = await axios.post(`${API_BASE_URL}/votes/${voteId}/cast?agree=${agree}`);
     return response.data;
   } catch (error) {
-    throw error.response?.data?.message || error.message;
+    const backendError = typeof error.response?.data === 'string' 
+      ? error.response.data 
+      : error.response?.data?.message;
+    throw backendError || error.message;
   }
 };
 

@@ -77,7 +77,7 @@ const ContributorMarker = ({ owner, position, delay }) => {
 };
 
 // 3D Voting Hologram
-const VotingHologram = ({ currentVote, coOwnersCount, onVoteCast, onDeleteVote }) => {
+const VotingHologram = ({ currentVote, coOwnersCount, onVoteCast, onDeleteVote, currentUser, coOwners }) => {
   if (!currentVote) return null;
 
   const isLeaderVote = currentVote.type === 'LEADER_ELECTION' || currentVote.title?.toLowerCase().includes('trưởng') || currentVote.title?.toLowerCase().includes('bầu');
@@ -95,31 +95,74 @@ const VotingHologram = ({ currentVote, coOwnersCount, onVoteCast, onDeleteVote }
     logicText = `Yêu cầu ${currentVote.requiredVotes || Math.ceil(coOwnersCount / 2)} phiếu đồng ý để duyệt`;
   }
 
+  const hasVotedAgree = currentVote.voterIds?.includes(currentUser?.id);
+  const hasVotedReject = currentVote.rejecterIds?.includes(currentUser?.id);
+  const hasVoted = hasVotedAgree || hasVotedReject;
+
+  const agreeCount = currentVote.voterIds?.length || 0;
+  const rejectCount = currentVote.rejecterIds?.length || 0;
+  const requiredVotes = isLeaderVote ? (coOwnersCount <= 2 ? 1 : Math.ceil(coOwnersCount * 0.75)) : (currentVote.requiredVotes || Math.ceil(coOwnersCount / 2));
+  
+  const voters = (currentVote.voterIds || []).map(id => coOwners.find(o => o.id === id)).filter(Boolean);
+
   return (
-    <Html transform position={[3, 1, 0]} rotation={[0, -0.6, 0]}>
-      <div className="w-[300px] bg-slate-900/80 backdrop-blur-md border border-brand-500 shadow-[0_0_40px_rgba(99,102,241,0.4)] rounded-2xl p-5 text-white animate-fade-in pointer-events-auto relative">
-        <button 
-          onClick={() => onDeleteVote(currentVote.id)}
-          className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
-          title="Xóa đề xuất này"
-        >
-          <i className="ph ph-trash"></i>
-        </button>
-        <div className="flex items-center gap-2 mb-3 border-b border-slate-700 pb-3 pr-6">
-          <i className="ph-fill ph-broadcast text-brand-500 animate-pulse text-xl"></i>
-          <div>
-            <h4 className="text-sm font-bold text-white leading-tight">{currentVote.title}</h4>
-            <p className="text-[10px] text-brand-400 uppercase tracking-widest mt-0.5">ĐANG CHỜ PHIẾU BẦU</p>
+    <div className="absolute right-6 top-1/2 -translate-y-1/2 z-50 w-[300px] bg-slate-900/80 backdrop-blur-md border border-brand-500 shadow-[0_0_40px_rgba(99,102,241,0.4)] rounded-2xl p-5 text-white animate-fade-in pointer-events-auto flex flex-col gap-4">
+      <button 
+        onClick={() => onDeleteVote(currentVote.id)}
+        className="absolute top-3 right-3 w-7 h-7 rounded-full bg-red-500/10 hover:bg-red-500/20 text-red-400 flex items-center justify-center transition-colors"
+        title="Xóa đề xuất này"
+      >
+        <i className="ph ph-trash"></i>
+      </button>
+
+      {/* Header */}
+      <div className="flex items-center gap-2 border-b border-slate-700 pb-3 pr-6">
+        <i className="ph-fill ph-broadcast text-brand-500 animate-pulse text-xl"></i>
+        <div>
+          <h4 className="text-sm font-bold text-white leading-tight">{currentVote.title}</h4>
+          <p className="text-[10px] text-brand-400 uppercase tracking-widest mt-0.5">ĐANG CHỜ PHIẾU BẦU</p>
+        </div>
+      </div>
+      
+      {/* Progress Section */}
+      <div className="bg-slate-950/50 rounded-lg p-3 border border-slate-800 flex flex-col gap-3">
+        <div>
+          <p className="text-xs text-slate-300 font-medium leading-relaxed mb-1">
+            <span className="text-brand-400 font-bold">Quy tắc bầu:</span> {logicText}
+          </p>
+          <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2 overflow-hidden flex">
+            <div className="bg-brand-500 h-full transition-all" style={{ width: `${Math.min(100, (agreeCount / coOwnersCount) * 100)}%` }}></div>
+            <div className="bg-red-500 h-full transition-all" style={{ width: `${Math.min(100, (rejectCount / coOwnersCount) * 100)}%` }}></div>
+          </div>
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>Đồng ý: {agreeCount}</span>
+            <span>Từ chối: {rejectCount}</span>
+            <span>Cần: {requiredVotes}</span>
           </div>
         </div>
         
-        <div className="bg-slate-950/50 rounded-lg p-3 mb-4 border border-slate-800">
-          <p className="text-xs text-slate-300 font-medium leading-relaxed">
-            <span className="text-brand-400 font-bold">Quy tắc bầu:</span> {logicText}
+        {/* Voters Avatars */}
+        {voters.length > 0 && (
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-800/50">
+            <span className="text-[10px] text-slate-400 uppercase">Đã đồng ý:</span>
+            <div className="flex -space-x-2">
+              {voters.map(v => (
+                <img key={v.id} src={v.avatarUrl || `https://ui-avatars.com/api/?name=${v.name}&background=random`} alt={v.name} className="w-6 h-6 rounded-full border border-slate-900" title={v.name} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      {hasVoted ? (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-center">
+          <p className="text-emerald-400 text-xs font-bold uppercase tracking-wide">
+            <i className="ph-fill ph-check-circle mr-1"></i> BẠN ĐÃ BỎ PHIẾU
           </p>
         </div>
-
-        <div className="flex gap-2">
+      ) : (
+        <div className="flex gap-2 mt-1">
           <button onClick={() => onVoteCast(currentVote.id, true)} className="flex-1 bg-brand-500 hover:bg-brand-600 text-white py-2 rounded-lg text-sm font-bold shadow-[0_0_15px_rgba(99,102,241,0.5)] transition-all">
             ĐỒNG Ý
           </button>
@@ -127,8 +170,8 @@ const VotingHologram = ({ currentVote, coOwnersCount, onVoteCast, onDeleteVote }
             PHẢN ĐỐI
           </button>
         </div>
-      </div>
-    </Html>
+      )}
+    </div>
   );
 };
 
@@ -364,7 +407,7 @@ const GroupCouncil3D = ({
                       <directionalLight position={[-10, 10, -5]} intensity={1} color="#14b8a6" />
                       <Environment preset="night" />
                       <Float speed={2} rotationIntensity={0.5} floatIntensity={0.5}>
-                        <CarModel3D />
+                        <CarModel3D vehicle={vehicle} />
                       </Float>
                       {/* Floating Contributor Markers */}
                       {coOwners.map((owner, idx) => {
@@ -393,19 +436,6 @@ const GroupCouncil3D = ({
                           />
                         );
                       })}
-                      
-                      {/* Voting Hologram (only visible when active vote) */}
-                      {currentVote && (
-                        <VotingHologram 
-                          currentVote={currentVote} 
-                          coOwnersCount={coOwners.length} 
-                          onVoteCast={onVoteCast} 
-                          onDeleteVote={(id) => {
-                            handleDeleteVote(id);
-                            setSelectedVoteId(null);
-                          }} 
-                        />
-                      )}
 
                       <OrbitControls enableZoom={true} enablePan={true} maxPolarAngle={Math.PI/2} minDistance={2} maxDistance={10} />
                     </Canvas>
@@ -414,6 +444,21 @@ const GroupCouncil3D = ({
                 {/* laser guides */}
                 <div className="laser absolute top-[38%] left-[18%] w-[26%] z-0 pointer-events-none"></div>
                 <div className="laser absolute top-[58%] right-[22%] w-[22%] z-0 pointer-events-none" style={{ background: 'linear-gradient(270deg,rgba(99,102,241,.7),transparent)' }}></div>
+
+                {/* Voting Hologram 2D Overlay */}
+                {currentVote && (
+                  <VotingHologram 
+                    currentVote={currentVote} 
+                    coOwnersCount={coOwners.length} 
+                    onVoteCast={onVoteCast} 
+                    onDeleteVote={(id) => {
+                      handleDeleteVote(id);
+                      setSelectedVoteId(null);
+                    }} 
+                    currentUser={currentUser}
+                    coOwners={coOwners}
+                  />
+                )}
 
                 {/* floating glass overlays */}
                 <div className="absolute top-[26%] left-[4%] z-30 glass-panel rounded-2xl px-4 py-2.5 flex items-center gap-3 animate-bounce-slow pointer-events-none">

@@ -208,8 +208,8 @@ public class DashboardController {
             return ResponseEntity.badRequest().body("Không tìm thấy xe.");
         }
 
-        if (vehicle.getStatus() == Vehicle.VehicleStatus.IN_USE) {
-            return ResponseEntity.badRequest().body("Xe đang được sử dụng trên đường, không thể đặt lịch lúc này. Vui lòng chờ xe được trả về bãi!");
+        if (vehicle.getStatus() == Vehicle.VehicleStatus.MAINTENANCE) {
+            return ResponseEntity.badRequest().body("Xe đang được bảo dưỡng, không thể đặt lịch lúc này!");
         }
 
         // 2. Check for overlapping bookings
